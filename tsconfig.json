@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "jsx": "react-native",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "types": [
+      "node",
+      "jest"
+    ]
+  },
+  "include": [
+    "src/**/*",
+    "app/**/*",
+    "__tests__/**/*"
+  ],
+  "extends": "expo/tsconfig.base"
+}

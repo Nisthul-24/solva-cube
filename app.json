@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "SolvaCube",
+    "slug": "solvacube",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "solvacube",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
+    "android": {
+      "package": "com.solvacube.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F172A"
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "userTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
+    }
+  }
+}
+
