@@ -324,3 +324,8 @@ async function saveState(puzzleId: PuzzleId, state: any) {
   } catch {}
 }
 
+if (typeof window !== 'undefined') {
+  (window as any).__solvaStore = usePuzzleStore;
+}
+
+
