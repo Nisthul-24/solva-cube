@@ -47,6 +47,29 @@ class Vector3 {
     this.z = iz * qw + iw * -qz + ix * -qy - iy * -qx;
     return this;
   }
+  project(camera) {
+    if (!camera || !camera.position) return this;
+    const C = camera.position;
+    const fovRad = ((camera.fov || 50) * Math.PI) / 180;
+    const tanHalfFov = Math.tan(fovRad / 2);
+    const forward = new Vector3(-C.x, -C.y, -C.z).normalize();
+    let right = new Vector3().crossVectors(forward, new Vector3(0, 1, 0));
+    if (right.lengthSq() < 1e-4) {
+      right = new Vector3(1, 0, 0);
+    } else {
+      right.normalize();
+    }
+    const up = new Vector3().crossVectors(right, forward).normalize();
+    const rel = new Vector3(this.x - C.x, this.y - C.y, this.z - C.z);
+    const zCam = rel.dot(forward);
+    const xCam = rel.dot(right);
+    const yCam = rel.dot(up);
+    const aspect = camera.aspect || 1;
+    this.x = xCam / (Math.max(0.1, zCam) * tanHalfFov * aspect);
+    this.y = yCam / (Math.max(0.1, zCam) * tanHalfFov);
+    this.z = 0;
+    return this;
+  }
 }
 
 class Quaternion {
@@ -57,8 +80,12 @@ class Quaternion {
   clone() { return new Quaternion(this.x, this.y, this.z, this.w); }
   copy(q) { this.x = q.x; this.y = q.y; this.z = q.z; this.w = q.w; return this; }
   setFromAxisAngle(axis, angle) {
-    const halfAngle = angle / 2, s = Math.sin(halfAngle);
-    this.x = axis.x * s; this.y = axis.y * s; this.z = axis.z * s; this.w = Math.cos(halfAngle);
+    const halfAngle = angle / 2;
+    const s = Math.sin(halfAngle);
+    this.x = axis.x * s;
+    this.y = axis.y * s;
+    this.z = axis.z * s;
+    this.w = Math.cos(halfAngle);
     return this;
   }
   setFromUnitVectors(vFrom, vTo) {
@@ -96,7 +123,7 @@ class Quaternion {
       return this;
     }
     const sqrSinHalfTheta = 1.0 - cosHalfTheta * cosHalfTheta;
-    if (sqrSinHalfTheta <= 1e-4) {
+    if (sqrSinHalfTheta <= Number.EPSILON) {
       const s = 1 - t;
       this.w = s * w + t * this.w;
       this.x = s * x + t * this.x;
@@ -143,12 +170,37 @@ class Matrix4 {
   lookAt() { return this; }
 }
 class Color {
-  constructor(c) { this.c = c; }
+  constructor(c) {
+    this.c = c;
+    if (typeof c === 'string' && c.startsWith('#')) {
+      const hex = parseInt(c.slice(1), 16);
+      this.r = ((hex >> 16) & 255) / 255;
+      this.g = ((hex >> 8) & 255) / 255;
+      this.b = (hex & 255) / 255;
+    } else {
+      this.r = 1; this.g = 1; this.b = 1;
+    }
+  }
+}
+
+class PerspectiveCamera {
+  constructor(fov = 50, aspect = 1, near = 0.1, far = 1000) {
+    this.fov = fov;
+    this.aspect = aspect;
+    this.near = near;
+    this.far = far;
+    this.position = new Vector3();
+    this.matrixWorld = new Matrix4();
+  }
+  lookAt() {}
+  updateMatrixWorld() {}
+  updateProjectionMatrix() {}
 }
 
 module.exports = {
   Vector3,
   Quaternion,
+  PerspectiveCamera,
   BufferGeometry,
   BufferAttribute,
   Shape,
@@ -160,5 +212,7 @@ module.exports = {
   Euler,
   Matrix4,
   DoubleSide: 2,
+  BackSide: 1,
+  FrontSide: 0,
   AdditiveBlending: 2,
 };

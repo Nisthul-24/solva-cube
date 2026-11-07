@@ -7,6 +7,7 @@ import {
   turnInfo4x4,
 } from './cube4x4Geometry';
 import { areAllCentresSolved } from './cube4x4Centres';
+import { optimizeMoves4x4Objects } from '../core/moveOptimizer4x4';
 
 export interface EdgeWing {
   face1: FaceName3x3;
@@ -165,8 +166,14 @@ export function solve4x4Edges(
     const unsetupFR = invertSeq(setupFR);
     doMoves(setupFR);
 
-    // Test candidates: which one maximizes paired edges count
+    // Test candidates: which one maximizes paired edges count while preserving centres
     const candidates = [
+      ["Uw'", 'R', "U'", "R'", 'Uw'],
+      ["Uw'", 'R', 'U', "R'", 'Uw'],
+      ['Uw', 'R', "U'", "R'", "Uw'"],
+      ['Uw', 'R', 'U', "R'", "Uw'"],
+      ["Uw'", 'R', 'U2', "R'", 'Uw'],
+      ['Uw', 'R', 'U2', "R'", "Uw'"],
       MACRO_PAIR,
       [...FLIP_FR, ...MACRO_PAIR],
       [...MACRO_PAIR, ...FLIP_FR],
@@ -175,6 +182,7 @@ export function solve4x4Edges(
 
     let bestCand: string[] = candidates[0];
     let bestPairedCount = -1;
+    const initialPairedCount = EDGE_PAIRS_4X4.filter((e) => isEdgePaired(cur, e)).length;
 
     for (const cand of candidates) {
       let sim = cur;
@@ -182,11 +190,18 @@ export function solve4x4Edges(
       for (const m of unsetupFR) sim = apply4x4Move(sim, m);
       for (const m of unrot) sim = apply4x4Move(sim, m);
 
-      const count = EDGE_PAIRS_4X4.filter((e) => isEdgePaired(sim, e)).length;
-      if (count > bestPairedCount) {
-        bestPairedCount = count;
-        bestCand = cand;
+      if (areAllCentresSolved(sim, targetColors)) {
+        const count = EDGE_PAIRS_4X4.filter((e) => isEdgePaired(sim, e)).length;
+        if (count > bestPairedCount) {
+          bestPairedCount = count;
+          bestCand = cand;
+        }
       }
+    }
+
+    if (bestPairedCount <= initialPairedCount) {
+      // Fallback to standard macro
+      bestCand = MACRO_PAIR;
     }
 
     doMoves(bestCand);
@@ -194,5 +209,6 @@ export function solve4x4Edges(
     doMoves(unrot);
   }
 
-  return { moves, state: cur };
+  const optMoves = optimizeMoves4x4Objects(moves);
+  return { moves: optMoves, state: cur };
 }

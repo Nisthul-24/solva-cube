@@ -89,22 +89,23 @@ export function getNearestAcceptableCamera(
   // Desired direction on the visible side
   const desiredAxis = axisVec.clone().multiplyScalar(layerSign).normalize();
   const curDot = cur.dot(desiredAxis);
+  const minRequiredDot = puzzleId === 'pyraminx' ? 0.56 : 0.50;
 
-  // In Minimal mode, if current view already shows the turning layer with |dot| >= 0.5 on visible side:
-  if (autoViewMode === 'minimal' && curDot >= 0.5) {
+  // In Minimal mode, if current view already shows the turning layer with |dot| >= minRequiredDot on visible side:
+  if (autoViewMode === 'minimal' && curDot >= minRequiredDot) {
     return { targetDir: cur, changed: false };
   }
 
-  // If already at or above 0.5 dot product and not in always mode:
-  if (curDot >= 0.5 && autoViewMode !== 'always') {
+  // If already at or above minRequiredDot and not in always mode:
+  if (curDot >= minRequiredDot && autoViewMode !== 'always') {
     return { targetDir: cur, changed: false };
   }
 
-  // Nearest point on the sphere where dot(c, desiredAxis) >= 0.5:
+  // Nearest point on the sphere where dot(c, desiredAxis) >= minRequiredDot:
   // Along the great circle between cur and desiredAxis:
   // Angle between cur and desiredAxis:
   const angle = Math.acos(Math.max(-1, Math.min(1, curDot)));
-  const targetAngleFromAxis = (60 * Math.PI) / 180; // cos(60°) = 0.5
+  const targetAngleFromAxis = Math.acos(minRequiredDot);
 
   let neededRotation = angle - targetAngleFromAxis;
   if (neededRotation <= 0 && autoViewMode !== 'always') {

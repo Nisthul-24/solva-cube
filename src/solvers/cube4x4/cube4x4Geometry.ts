@@ -1,6 +1,14 @@
 import { FaceName3x3, Axis } from '../../components/3d/cubieModel';
 import { CubeColor } from '../../types/puzzle';
 import { Cube4x4State, TurnInfo4x4 } from './cube4x4Types';
+export { Cube4x4State, TurnInfo4x4 };
+
+export const ALL_54_4X4_MOVES: string[] = [];
+for (const base of ['U', 'D', 'L', 'R', 'F', 'B', 'Uw', 'Dw', 'Lw', 'Rw', 'Fw', 'Bw', 'u', 'd', 'l', 'r', 'f', 'b']) {
+  for (const suf of ['', "'", '2']) {
+    ALL_54_4X4_MOVES.push(`${base}${suf}`);
+  }
+}
 
 export interface Sticker4x4Layout {
   face: FaceName3x3;

@@ -19,7 +19,6 @@ import {
 import { PALETTE, scaleBrightness } from './stickerLayout';
 import { AutoViewOption, HighlightStyleOption } from '../../store/settingsStore';
 import { TurnArrowRibbon3D } from './TurnArrowRibbon3D';
-import { LayerBelt3D } from './LayerBelt3D';
 import { CameraRig } from './CameraRig';
 import { getPuzzleTurnInfo } from './puzzleTurnInfo';
 
@@ -142,26 +141,48 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
     };
   }, [currentMoveNotation]);
 
-  // Separate pieces into stationary vs rotating for layer animation / preview
+  // Inverted hull material for outline pass (Requirement 3b)
+  const invertedHullMaterial = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      vertexShader: `
+        uniform float offset;
+        void main() {
+          vec3 transformed = position + normal * offset;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 color;
+        void main() {
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `,
+      uniforms: {
+        offset: { value: 0.025 },
+        color: { value: new THREE.Color('#22d3ee') },
+      },
+      side: THREE.BackSide,
+      depthTest: true,
+      depthWrite: true,
+    });
+  }, []);
+
+  // Separate pieces into stationary vs rotating for layer animation / waiting lift
   const { stationaryPieces, rotatingPieces } = useMemo(() => {
     const stat: typeof pieceGeometries = [];
     const rot: typeof pieceGeometries = [];
 
+    const hasActiveMove = Boolean(currentMoveNotation && !isSolved);
+
     for (const piece of pieceGeometries) {
-      if ((isAnimating || isGhostPreview) && turningPieceIds.has(piece.id)) {
+      if ((isAnimating || isGhostPreview || hasActiveMove) && turningPieceIds.has(piece.id)) {
         rot.push(piece);
       } else {
         stat.push(piece);
       }
     }
     return { stationaryPieces: stat, rotatingPieces: rot };
-  }, [pieceGeometries, isAnimating, isGhostPreview, turningPieceIds]);
-
-  // Lift offset for turning pieces (0.08 outwards along turning axis in waiting state, 0 when animating)
-  const liftOffset: Vec3 = useMemo(() => {
-    if (isSolved || !currentMoveNotation || isAnimating) return [0, 0, 0];
-    return scale(normalize(turnAxis), 0.08);
-  }, [isSolved, currentMoveNotation, turnAxis, isAnimating]);
+  }, [pieceGeometries, isAnimating, isGhostPreview, currentMoveNotation, isSolved, turningPieceIds]);
 
   // Check if a sticker is in offendingStickers
   const isOffendingSticker = useCallback(
@@ -179,7 +200,9 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
     // 1. Pulse factor for offending stickers
     pulseFactor.current = 0.5 + 0.5 * Math.sin(Date.now() * 0.008);
 
-    // 3. Layer turn animation in useFrame (single animation at a time)
+    const axisNorm = new THREE.Vector3(...turnAxis).normalize();
+
+    // 2. Layer turn animation in useFrame (single animation at a time)
     if (isAnimating && currentMoveNotation && pivotRef.current && turnDurationMs > 0) {
       if (animStartTime.current === null) {
         animStartTime.current = performance.now();
@@ -188,13 +211,22 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
       const progress = Math.min(1, elapsed / turnDurationMs);
       const eased = easeInOutCubic(progress);
 
-      const axis = new THREE.Vector3(...turnAxis);
-      pivotRef.current.setRotationFromAxisAngle(axis, turnAngleRad * eased);
+      // Requirement 3a: in waiting state, pieces lift 0.08 outwards.
+      // When turn starts, they ease back to 0 over the first 250ms of the turn as they rotate.
+      let lift = 0;
+      if (elapsed < 250) {
+        const easeBack = 1 - easeInOutCubic(elapsed / 250);
+        lift = 0.08 * easeBack;
+      }
+
+      pivotRef.current.position.copy(axisNorm.clone().multiplyScalar(lift));
+      pivotRef.current.setRotationFromAxisAngle(axisNorm, turnAngleRad * eased);
 
       if (progress >= 1) {
         animStartTime.current = null;
         // STATE-DRIVEN RENDERING: reset pivot rotation to exact 0, detatch pieces, recolor from logical state
-        pivotRef.current.setRotationFromAxisAngle(axis, 0);
+        pivotRef.current.position.set(0, 0, 0);
+        pivotRef.current.setRotationFromAxisAngle(axisNorm, 0);
         onAnimationComplete?.();
       }
     } else if (isGhostPreview && currentMoveNotation && pivotRef.current && turnAngleRad !== 0) {
@@ -210,11 +242,17 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
       } else {
         angle = 0;
       }
-      const axis = new THREE.Vector3(...turnAxis);
-      pivotRef.current.setRotationFromAxisAngle(axis, angle);
+      pivotRef.current.position.set(0, 0, 0);
+      pivotRef.current.setRotationFromAxisAngle(axisNorm, angle);
     } else {
       animStartTime.current = null;
       if (pivotRef.current) {
+        // Requirement 3a: in waiting state, lift 0.08 outwards along vertex axis
+        if (currentMoveNotation && !isSolved) {
+          pivotRef.current.position.copy(axisNorm.clone().multiplyScalar(0.08));
+        } else {
+          pivotRef.current.position.set(0, 0, 0);
+        }
         pivotRef.current.rotation.set(0, 0, 0);
       }
     }
@@ -328,7 +366,7 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
         {/* Rotating Pieces Pivot Group */}
         <group ref={pivotRef}>
           {rotatingPieces.map((piece) => (
-            <group key={piece.id} position={liftOffset}>
+            <group key={piece.id}>
               {/* Dark Convex Body Geometry */}
               <mesh geometry={piece.bodyGeometry}>
                 <meshStandardMaterial
@@ -338,10 +376,17 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
                 />
               </mesh>
 
+              {/* Requirement 3b: Inverted Hull Outline Pass using real piece geometry */}
+              {!isAnimating && (
+                <mesh
+                  geometry={piece.bodyGeometry}
+                  material={invertedHullMaterial}
+                />
+              )}
+
               {/* Child Stickers */}
               {piece.stickers.map((st) => {
                 const offending = isOffendingSticker(st.face, st.index);
-                const isGlow = false;
                 return (
                   <mesh
                     key={st.id}
@@ -356,8 +401,8 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
                       roughness={0.35}
                       metalness={0.05}
                       side={THREE.DoubleSide}
-                      emissive={offending ? '#ef4444' : isGlow ? '#22d3ee' : '#000000'}
-                      emissiveIntensity={offending ? 0.75 : isGlow ? 0.35 : 0}
+                      emissive={offending ? '#ef4444' : '#000000'}
+                      emissiveIntensity={offending ? 0.75 : 0}
                     />
                   </mesh>
                 );
@@ -365,16 +410,6 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
             </group>
           ))}
         </group>
-
-        {/* Section 1b: Continuous thin bright layer belt loops */}
-        {currentMoveNotation && !isSolved && (
-          <LayerBelt3D
-            puzzleType="pyraminx"
-            move={currentMoveNotation}
-            highlightStyle={highlightStyle}
-            visible={!isAnimating}
-          />
-        )}
 
         {/* Unified Flat Ribbon Turn Arrow */}
         {currentMoveNotation && !isSolved && (

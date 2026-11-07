@@ -19,10 +19,9 @@ export function getPuzzle<T = any>(id: PuzzleId): Puzzle<T> {
   return puzzle as unknown as Puzzle<T>;
 }
 
+export { Cube3x3Solver } from './cube3x3/cube3x3Solver';
+export { Cube2x2Solver } from './cube2x2/cube2x2Solver';
+export { Cube4x4Solver } from './cube4x4/cube4x4Solver';
+export { PyraminxSolver } from './pyraminx/pyraminxSolver';
 export * from './core/cubeUtils';
-export * from './cube3x3/cube3x3Solver';
-export * from './cube3x3/kociembaAdapter';
-export * from './cube2x2/cube2x2Solver';
-export * from './cube4x4/cube4x4Solver';
-export * from './pyraminx/pyraminxSolver';
 

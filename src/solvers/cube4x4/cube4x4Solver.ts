@@ -20,6 +20,7 @@ import {
 } from './cube4x4Geometry';
 import { solve4x4Centres } from './cube4x4Centres';
 import { solve4x4Edges } from './cube4x4Edges';
+import { optimizeMoves4x4Objects } from '../core/moveOptimizer4x4';
 
 export const OLL_PARITY_MACRO = [
   'r2', 'B2', 'U2',
@@ -266,9 +267,20 @@ export class Cube4x4Solver implements Puzzle<Cube4x4State> {
     }
 
     if (!solved) {
-      throw new Error('Could not reduce 4x4 to 3x3 or resolve parities.');
+      throw new Error('We could not solve this cube. Please check your colours.');
     }
 
-    return moves;
+    const finalMoves = optimizeMoves4x4Objects(moves);
+
+    // Strictly verify by replay (Requirement 2e)
+    let verifyState = this.cloneState(state);
+    for (const m of finalMoves) {
+      verifyState = apply4x4Move(verifyState, m.notation);
+    }
+    if (!this.isSolved(verifyState)) {
+      throw new Error('We could not solve this cube. Please check your colours.');
+    }
+
+    return finalMoves;
   }
 }

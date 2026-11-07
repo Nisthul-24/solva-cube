@@ -8,6 +8,7 @@ import {
   turnInfo4x4,
   getStandardSolved4x4State,
 } from './cube4x4Geometry';
+import { optimizeMoves4x4Objects } from '../core/moveOptimizer4x4';
 
 export const CENTER_INDICES = [5, 6, 9, 10];
 
@@ -230,5 +231,6 @@ export function solve4x4Centres(
     if (!madeProgress) break;
   }
 
-  return { moves, state: cur };
+  const optMoves = optimizeMoves4x4Objects(moves);
+  return { moves: optMoves, state: cur };
 }

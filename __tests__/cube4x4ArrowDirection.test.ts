@@ -100,3 +100,4 @@ describe('4x4 Move Arrows: Render-Level Direction Test', () => {
     expect(screenDot).toBeLessThan(0);
   });
 });
+
