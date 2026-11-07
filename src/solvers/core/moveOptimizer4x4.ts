@@ -1,22 +1,22 @@
 import { Move } from '../../types/puzzle';
 import { turnInfo4x4 } from '../cube4x4/cube4x4Geometry';
+import { VirtualFrame4x4 } from './virtualFrame4x4';
 
 export type Axis4x4 = 'x' | 'y' | 'z';
 
-interface ParsedMove4x4 {
+export interface ParsedMove4x4 {
   notation: string;
   axis: Axis4x4;
-  layerAmounts: [number, number, number, number]; // [layer0, layer1, layer2, layer3] amounts in 0..3
+  layerAmounts: [number, number, number, number]; // [layer0, layer1, layer2, layer3] in +axis coordinates (0..3)
 }
 
-// Amount parser: '' -> 1, '2' -> 2, "'" -> 3
 function parseAmount(suffix: string): number {
   if (suffix === '2') return 2;
   if (suffix === "'") return 3;
   return 1;
 }
 
-function formatAmount(base: string, amount: number): string {
+export function formatAmount(base: string, amount: number): string {
   const mod = ((amount % 4) + 4) % 4;
   if (mod === 0) return '';
   if (mod === 1) return base;
@@ -25,6 +25,10 @@ function formatAmount(base: string, amount: number): string {
   return '';
 }
 
+/**
+ * Parses any 4x4 move notation into a 4-layer rotation vector [L0, L1, L2, L3]
+ * oriented along the positive axis direction (+x for R, +y for U, +z for F).
+ */
 export function parse4x4MoveToLayers(notation: string): ParsedMove4x4 {
   const face = notation[0];
   let isWide = false;
@@ -52,19 +56,22 @@ export function parse4x4MoveToLayers(notation: string): ParsedMove4x4 {
       axis = 'x';
       layerAmounts[2] = amount;
       break;
-    case 'L':
+    case 'L': {
       axis = 'x';
+      const amtX = ((4 - amount) % 4 + 4) % 4;
       if (isWide) {
-        layerAmounts[0] = amount;
-        layerAmounts[1] = amount;
+        layerAmounts[0] = amtX;
+        layerAmounts[1] = amtX;
       } else {
-        layerAmounts[0] = amount;
+        layerAmounts[0] = amtX;
       }
       break;
-    case 'l':
+    }
+    case 'l': {
       axis = 'x';
-      layerAmounts[1] = amount;
+      layerAmounts[1] = ((4 - amount) % 4 + 4) % 4;
       break;
+    }
 
     case 'U':
       axis = 'y';
@@ -79,19 +86,22 @@ export function parse4x4MoveToLayers(notation: string): ParsedMove4x4 {
       axis = 'y';
       layerAmounts[2] = amount;
       break;
-    case 'D':
+    case 'D': {
       axis = 'y';
+      const amtY = ((4 - amount) % 4 + 4) % 4;
       if (isWide) {
-        layerAmounts[0] = amount;
-        layerAmounts[1] = amount;
+        layerAmounts[0] = amtY;
+        layerAmounts[1] = amtY;
       } else {
-        layerAmounts[0] = amount;
+        layerAmounts[0] = amtY;
       }
       break;
-    case 'd':
+    }
+    case 'd': {
       axis = 'y';
-      layerAmounts[1] = amount;
+      layerAmounts[1] = ((4 - amount) % 4 + 4) % 4;
       break;
+    }
 
     case 'F':
       axis = 'z';
@@ -106,25 +116,31 @@ export function parse4x4MoveToLayers(notation: string): ParsedMove4x4 {
       axis = 'z';
       layerAmounts[2] = amount;
       break;
-    case 'B':
+    case 'B': {
       axis = 'z';
+      const amtZ = ((4 - amount) % 4 + 4) % 4;
       if (isWide) {
-        layerAmounts[0] = amount;
-        layerAmounts[1] = amount;
+        layerAmounts[0] = amtZ;
+        layerAmounts[1] = amtZ;
       } else {
-        layerAmounts[0] = amount;
+        layerAmounts[0] = amtZ;
       }
       break;
-    case 'b':
+    }
+    case 'b': {
       axis = 'z';
-      layerAmounts[1] = amount;
+      layerAmounts[1] = ((4 - amount) % 4 + 4) % 4;
       break;
+    }
   }
 
   return { notation, axis, layerAmounts };
 }
 
-function synthesizeAxisMoves(
+/**
+ * Computes minimal moves to realize [a0, a1, a2, a3] along axis.
+ */
+function synthesizeCanonicalMoves(
   axis: Axis4x4,
   amounts: [number, number, number, number]
 ): string[] {
@@ -155,6 +171,17 @@ function synthesizeAxisMoves(
 
   const [a0, a1, a2, a3] = amounts.map((v) => ((v % 4) + 4) % 4);
 
+  // Negative side (layers 0 & 1): convert +axis amounts back to negative face turns
+  const neg0 = a0 === 0 ? 0 : (4 - a0) % 4;
+  const neg1 = a1 === 0 ? 0 : (4 - a1) % 4;
+
+  if (neg0 !== 0 && neg0 === neg1) {
+    result.push(formatAmount(negWide, neg0));
+  } else {
+    if (neg0 !== 0) result.push(formatAmount(negOuter, neg0));
+    if (neg1 !== 0) result.push(formatAmount(negInner, neg1));
+  }
+
   // Positive side (layers 2 & 3)
   if (a2 !== 0 && a2 === a3) {
     result.push(formatAmount(posWide, a2));
@@ -163,25 +190,54 @@ function synthesizeAxisMoves(
     if (a2 !== 0) result.push(formatAmount(posInner, a2));
   }
 
-  // Negative side (layers 0 & 1)
-  if (a0 !== 0 && a0 === a1) {
-    result.push(formatAmount(negWide, a0));
-  } else {
-    if (a0 !== 0) result.push(formatAmount(negOuter, a0));
-    if (a1 !== 0) result.push(formatAmount(negInner, a1));
-  }
-
   return result.filter(Boolean);
 }
 
 /**
- * Optimizes a list of 4x4 move notations:
- * 1. Merges consecutive and commuting same-axis moves.
- * 2. Merges outer + inner into wide moves (e.g. R + r -> Rw).
- * 3. Cancels inverse moves (e.g. U + U' -> null).
- * 4. Iterates to fixed point.
+ * Same-axis normal form optimizer with common frame absorption.
+ * If frame is passed, searches g in {0, 1, 2, 3} to absorb common frame rotation.
+ * If frame is not passed, g is strictly 0 to preserve identical physical state.
  */
-export function optimizeMoves4x4(moves: string[]): string[] {
+export function optimizeSameAxisRun(
+  axis: Axis4x4,
+  q: [number, number, number, number],
+  frame?: VirtualFrame4x4
+): { moves: string[]; absorbedG: number } {
+  let bestMoves: string[] = [];
+  let bestG = 0;
+  let minCost = Infinity;
+
+  const maxG = frame ? 4 : 1;
+
+  for (let g = 0; g < maxG; g++) {
+    const a: [number, number, number, number] = [
+      ((q[0] - g) % 4 + 4) % 4,
+      ((q[1] - g) % 4 + 4) % 4,
+      ((q[2] - g) % 4 + 4) % 4,
+      ((q[3] - g) % 4 + 4) % 4,
+    ];
+
+    const moves = synthesizeCanonicalMoves(axis, a);
+    const cost = moves.length;
+
+    if (cost < minCost || (cost === minCost && g === 0)) {
+      minCost = cost;
+      bestMoves = moves;
+      bestG = g;
+    }
+  }
+
+  if (frame && bestG !== 0) {
+    frame.absorbRotation(axis, bestG);
+  }
+
+  return { moves: bestMoves, absorbedG: bestG };
+}
+
+/**
+ * Optimizes a list of 4x4 move notations using same-axis normal form and virtual frame.
+ */
+export function optimizeMoves4x4(moves: string[], frame?: VirtualFrame4x4): string[] {
   if (moves.length === 0) return [];
 
   let curMoves = [...moves];
@@ -211,8 +267,8 @@ export function optimizeMoves4x4(moves: string[]): string[] {
         }
       }
 
-      const synthesized = synthesizeAxisMoves(currentAxis, combinedAmounts);
-      newMoves.push(...synthesized);
+      const { moves: optAxisMoves } = optimizeSameAxisRun(currentAxis, combinedAmounts, frame);
+      newMoves.push(...optAxisMoves);
       i = j;
     }
 
@@ -228,10 +284,10 @@ export function optimizeMoves4x4(moves: string[]): string[] {
 /**
  * Optimizes Move objects, preserving descriptions and stages.
  */
-export function optimizeMoves4x4Objects(moves: Move[]): Move[] {
+export function optimizeMoves4x4Objects(moves: Move[], frame?: VirtualFrame4x4): Move[] {
   if (moves.length === 0) return [];
   const notations = moves.map((m) => m.notation);
-  const optimizedNotations = optimizeMoves4x4(notations);
+  const optimizedNotations = optimizeMoves4x4(notations, frame);
 
   const stageMap = new Map<string, string>();
   for (const m of moves) {
@@ -252,4 +308,3 @@ export function optimizeMoves4x4Objects(moves: Move[]): Move[] {
     };
   });
 }
-

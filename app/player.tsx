@@ -44,6 +44,7 @@ import { turnInfo4x4 } from '../src/solvers/cube4x4/cube4x4Geometry';
 import { getPuzzle } from '../src/solvers';
 import { Cube3x3State } from '../src/solvers/cube3x3/cube3x3Facelets';
 import { getFrontMovementHint } from '../src/components/3d/puzzleTurnInfo';
+import { PlaybackController, PlaybackState } from '../src/components/playback/playbackController';
 
 export default function SolutionPlayerScreen() {
   const router = useRouter();
@@ -88,6 +89,10 @@ export default function SolutionPlayerScreen() {
   const isDouble = currentMoveNotation ? currentMoveNotation.includes('2') : false;
 
   // Animation & Camera sequence states
+  const isNewPlayback = activePuzzleId === 'pyraminx' || activePuzzleId === '4x4';
+  const [controllerState, setControllerState] = useState<PlaybackState>('idle');
+  const controllerRef = useRef<PlaybackController | null>(null);
+
   const [isAnimating, setIsAnimating] = useState(false);
   const [animatingMove, setAnimatingMove] = useState<string | null>(null);
   const [isCameraMoving, setIsCameraMoving] = useState(false);
@@ -95,25 +100,80 @@ export default function SolutionPlayerScreen() {
   const [showGuideCard, setShowGuideCard] = useState(false);
   const playTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // When move changes, stop ghost preview and handle auto view camera movement
-  useEffect(() => {
-    setIsGhostPreview(false);
-    if (autoViewMode !== 'off' && currentMoveNotation && !isSolved) {
-      setIsCameraMoving(true);
-    } else {
-      setIsCameraMoving(false);
-    }
-  }, [currentMoveIndex, currentMoveNotation, autoViewMode, isSolved]);
-
-  const handleCameraMoveComplete = useCallback(() => {
-    setIsCameraMoving(false);
-  }, []);
-
   // Speed durations (Requirement 2)
   const { turnDurationMs, arrowWaitDurationMs } = useMemo(
     () => getSpeedDurations(speedOption, isDouble),
     [speedOption, isDouble]
   );
+
+  // References for live controller callbacks
+  const totalMovesRef = useRef(totalMoves);
+  totalMovesRef.current = totalMoves;
+  const currentMoveIndexRef = useRef(currentMoveIndex);
+  currentMoveIndexRef.current = currentMoveIndex;
+  const currentMoveNotationRef = useRef(currentMoveNotation);
+  currentMoveNotationRef.current = currentMoveNotation;
+  const turnDurationMsRef = useRef(turnDurationMs);
+  turnDurationMsRef.current = turnDurationMs;
+  const arrowWaitDurationMsRef = useRef(arrowWaitDurationMs);
+  arrowWaitDurationMsRef.current = arrowWaitDurationMs;
+  const autoViewModeRef = useRef(autoViewMode);
+  autoViewModeRef.current = autoViewMode;
+
+  useEffect(() => {
+    if (!isNewPlayback) return;
+    const controller = new PlaybackController({
+      getTotalMoves: () => totalMovesRef.current,
+      getCurrentMoveIndex: () => currentMoveIndexRef.current,
+      getCurrentMoveNotation: () => currentMoveNotationRef.current,
+      getTurnDurationMs: () => turnDurationMsRef.current,
+      getArrowWaitDurationMs: () => arrowWaitDurationMsRef.current,
+      isAutoViewNeeded: (_move: string) => autoViewModeRef.current !== 'off',
+      onStartCameraGlide: (_move: string) => {
+        setIsCameraMoving(true);
+      },
+      onStartTurnAnimation: (move: string) => {
+        setIsAnimating(true);
+        setAnimatingMove(move);
+      },
+      onApplyMove: (_move: string) => {
+        nextMove();
+      },
+      onStepBack: () => {
+        prevMove();
+      },
+      onStateChange: (st: PlaybackState) => {
+        setControllerState(st);
+      },
+    });
+    controllerRef.current = controller;
+    if (typeof window !== 'undefined') {
+      (window as any).__playbackController = controller;
+    }
+    return () => {
+      controller.destroy();
+      controllerRef.current = null;
+    };
+  }, [isNewPlayback, nextMove, prevMove]);
+
+  // When move changes, stop ghost preview and handle auto view camera movement
+  useEffect(() => {
+    setIsGhostPreview(false);
+    if (!isNewPlayback) {
+      if (autoViewMode !== 'off' && currentMoveNotation && !isSolved) {
+        setIsCameraMoving(true);
+      } else {
+        setIsCameraMoving(false);
+      }
+    }
+  }, [currentMoveIndex, currentMoveNotation, autoViewMode, isSolved, isNewPlayback]);
+
+  const handleCameraMoveComplete = useCallback(() => {
+    setIsCameraMoving(false);
+    if (isNewPlayback) {
+      controllerRef.current?.notifyCameraComplete();
+    }
+  }, [isNewPlayback]);
 
   const speedLabel = useMemo(() => {
     switch (speedOption) {
@@ -198,13 +258,18 @@ export default function SolutionPlayerScreen() {
     setIsAnimating(false);
     setAnimatingMove(null);
 
-    if (animatingMove && !animatingMove.endsWith('_rev')) {
-      nextMove();
+    if (isNewPlayback) {
+      controllerRef.current?.notifyTurnComplete();
+    } else {
+      if (animatingMove && !animatingMove.endsWith('_rev')) {
+        nextMove();
+      }
     }
-  }, [animatingMove, nextMove]);
+  }, [animatingMove, nextMove, isNewPlayback]);
 
-  // Automated playback sequence: camera move -> arrow wait -> animate turn -> repeat
+  // Automated playback sequence for frozen puzzles (3x3, 2x2): camera move -> arrow wait -> animate turn -> repeat
   useEffect(() => {
+    if (isNewPlayback) return;
     if (isPlaying && !isSolved && !isAnimating && !isCameraMoving) {
       playTimerRef.current = setTimeout(() => {
         if (!isSolved && currentMoveNotation && !isAnimating) {
@@ -220,14 +285,48 @@ export default function SolutionPlayerScreen() {
     return () => {
       if (playTimerRef.current) clearTimeout(playTimerRef.current);
     };
-  }, [isPlaying, isSolved, isAnimating, isCameraMoving, currentMoveIndex, currentMoveNotation, arrowWaitDurationMs]);
+  }, [isPlaying, isSolved, isAnimating, isCameraMoving, currentMoveIndex, currentMoveNotation, arrowWaitDurationMs, isNewPlayback]);
 
   // Stop playing when solved
   useEffect(() => {
-    if (isSolved && isPlaying) {
+    if (isSolved) {
+      if (isNewPlayback) {
+        controllerRef.current?.pause();
+      } else if (isPlaying) {
+        togglePlay();
+      }
+    }
+  }, [isSolved, isPlaying, togglePlay, isNewPlayback]);
+
+  const isEffectivePlaying = isNewPlayback
+    ? controllerState === 'camera' || controllerState === 'waiting' || controllerState === 'turning'
+    : isPlaying;
+
+  const handlePlayPause = useCallback(() => {
+    hapticFeedback.light();
+    if (isNewPlayback) {
+      if (isEffectivePlaying) {
+        controllerRef.current?.pause();
+      } else {
+        if (isGhostPreview) setIsGhostPreview(false);
+        controllerRef.current?.play();
+      }
+    } else {
       togglePlay();
     }
-  }, [isSolved, isPlaying, togglePlay]);
+  }, [isNewPlayback, isEffectivePlaying, isGhostPreview, togglePlay]);
+
+  const handleToggleShowMe = useCallback(() => {
+    hapticFeedback.light();
+    if (!isGhostPreview) {
+      if (isNewPlayback) {
+        controllerRef.current?.pause();
+      }
+      setIsGhostPreview(true);
+    } else {
+      setIsGhostPreview(false);
+    }
+  }, [isGhostPreview, isNewPlayback]);
 
   // Show interstitial once on solved screen if policy allows (3-min gap)
   useEffect(() => {
@@ -237,20 +336,30 @@ export default function SolutionPlayerScreen() {
   }, [showSolvedCelebration]);
 
   const handleNext = () => {
-    if (isSolved || isAnimating || isCameraMoving) return;
+    if (isSolved) return;
     setIsGhostPreview(false);
     hapticFeedback.medium();
-    if (currentMoveNotation) {
-      setIsAnimating(true);
-      setAnimatingMove(currentMoveNotation);
+    if (isNewPlayback) {
+      controllerRef.current?.next();
+    } else {
+      if (isAnimating || isCameraMoving) return;
+      if (currentMoveNotation) {
+        setIsAnimating(true);
+        setAnimatingMove(currentMoveNotation);
+      }
     }
   };
 
   const handleBack = () => {
-    if (currentMoveIndex <= 0 || isAnimating) return;
+    if (currentMoveIndex <= 0) return;
     setIsGhostPreview(false);
     hapticFeedback.light();
-    prevMove();
+    if (isNewPlayback) {
+      controllerRef.current?.prev();
+    } else {
+      if (isAnimating) return;
+      prevMove();
+    }
   };
 
   const handleStartOver = () => {
@@ -258,6 +367,9 @@ export default function SolutionPlayerScreen() {
     hapticFeedback.medium();
     setIsAnimating(false);
     setAnimatingMove(null);
+    if (isNewPlayback) {
+      controllerRef.current?.destroy();
+    }
     restartSolution();
   };
 
@@ -469,10 +581,7 @@ export default function SolutionPlayerScreen() {
                 {/* "Show me" Preview Button */}
                 <TouchableOpacity
                   style={[styles.showMeBtn, isGhostPreview && styles.showMeBtnActive]}
-                  onPress={() => {
-                    hapticFeedback.light();
-                    setIsGhostPreview((prev) => !prev);
-                  }}
+                  onPress={handleToggleShowMe}
                   activeOpacity={0.7}
                   accessibilityRole="button"
                   accessibilityLabel="Show move preview"
@@ -573,12 +682,12 @@ export default function SolutionPlayerScreen() {
 
             <TouchableOpacity
               style={[styles.playerBtn, styles.playPauseBtn]}
-              onPress={togglePlay}
+              onPress={isNewPlayback ? handlePlayPause : togglePlay}
               disabled={isSolved}
               accessibilityRole="button"
-              accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
+              accessibilityLabel={isEffectivePlaying ? 'Pause' : 'Play'}
             >
-              {isPlaying ? (
+              {isEffectivePlaying ? (
                 <Pause size={28} color="#0B1120" strokeWidth={2.5} />
               ) : (
                 <Play size={28} color="#0B1120" strokeWidth={2.5} style={{ marginLeft: 3 }} />

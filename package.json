@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
-    "lint": "eslint \"app/**/*.{ts,tsx}\" \"src/**/*.{ts,tsx}\""
+    "lint": "eslint \"app/**/*.{ts,tsx}\" \"src/**/*.{ts,tsx}\"",
+    "bench:4x4": "sucrase-node scripts/bench4x4.ts"
   },
   "dependencies": {
     "@expo/metro-runtime": "~4.0.1",
