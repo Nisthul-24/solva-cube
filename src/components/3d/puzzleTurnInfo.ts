@@ -266,25 +266,17 @@ export function getPuzzleTurnInfo(
     const face = clean[0].toUpperCase() as FaceName3x3;
     const isDouble = clean.includes('2');
 
-    const faceOutwardNormals: Record<FaceName3x3, Vec3> = {
-      U: [0, 1, 0],
-      D: [0, -1, 0],
-      F: [0, 0, 1],
-      B: [0, 0, -1],
-      R: [1, 0, 0],
-      L: [-1, 0, 0],
-    };
-
-    const A = faceOutwardNormals[face] || [0, 1, 0];
+    // Global positive axis: +x, +y, +z strictly from 3D geometry
+    const axisVec: Vec3 = t4.axis === 'x' ? [1, 0, 0] : t4.axis === 'y' ? [0, 1, 0] : [0, 0, 1];
+    const A = axisVec;
     const { U, V } = getOrthonormalBasis(A);
     const angleRad = t4.angle;
 
-    // Mid-plane of turning slab for 4x4
-    const letter = clean[0];
-    const isWide = clean.includes('w');
-    const isInner = letter === letter.toLowerCase();
-    const slabDist = isWide ? 1.0 : isInner ? 0.5 : 1.5;
-    const arcCenter = scale(A, slabDist);
+    // Mid-plane along axis:
+    // layers indices: 0 -> -1.5, 1 -> -0.5, 2 -> 0.5, 3 -> 1.5
+    const layerCoords = [-1.5, -0.5, 0.5, 1.5];
+    const meanCoord = t4.layers.reduce((sum, l) => sum + layerCoords[l], 0) / t4.layers.length;
+    const arcCenter = scale(A, meanCoord);
 
     // Orbit arrow radius: 1.18 x half-diagonal of cross section (2.0 * sqrt(2))
     const arcRadius = 1.18 * (2.0 * Math.SQRT2); // ~3.3375
@@ -388,7 +380,7 @@ export function getPuzzleTurnInfo(
     const ribbonWidth = isTipOnly ? 0.08 : 0.11;
     const headLength = isTipOnly ? 0.26 : 0.35;
     const headWidth = isTipOnly ? 0.16 : 0.22;
-    const sweepSpan = (110 * Math.PI) / 180;
+    const sweepSpan = (120 * Math.PI) / 180;
 
     const arrow = buildOrbitArrow(
       arcCenter,

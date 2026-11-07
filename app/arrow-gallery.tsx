@@ -17,6 +17,7 @@ import { TurnDirectionIcon } from '../src/components/3d/TurnDirectionIcon';
 import { getPuzzleTurnInfo } from '../src/components/3d/puzzleTurnInfo';
 import { DEFAULT_3X3_SOLVED } from '../src/solvers/cube3x3/cube3x3Facelets';
 import { DEFAULT_PYRAMINX_SOLVED } from '../src/solvers/pyraminx/pyraminxFacelets';
+import { getStandardSolved4x4State } from '../src/solvers/cube4x4/cube4x4Geometry';
 import { Vec3 } from '../src/solvers/pyraminx/pyraminxGeometry';
 
 const DEFAULT_2X2_SOLVED = {
@@ -27,6 +28,8 @@ const DEFAULT_2X2_SOLVED = {
   L: ['orange', 'orange', 'orange', 'orange'],
   B: ['blue', 'blue', 'blue', 'blue'],
 };
+
+const DEFAULT_4X4_SOLVED = getStandardSolved4x4State();
 
 const MOVES_3X3 = [
   'R', "R'", 'R2',
@@ -43,6 +46,33 @@ const MOVES_2X2 = [
   'F', "F'", 'F2',
 ];
 
+const MOVES_4X4_OUTER = [
+  'R', "R'", 'R2',
+  'L', "L'", 'L2',
+  'U', "U'", 'U2',
+  'D', "D'", 'D2',
+  'F', "F'", 'F2',
+  'B', "B'", 'B2',
+];
+
+const MOVES_4X4_WIDE = [
+  'Rw', "Rw'", 'Rw2',
+  'Lw', "Lw'", 'Lw2',
+  'Uw', "Uw'", 'Uw2',
+  'Dw', "Dw'", 'Dw2',
+  'Fw', "Fw'", 'Fw2',
+  'Bw', "Bw'", 'Bw2',
+];
+
+const MOVES_4X4_INNER = [
+  'r', "r'", 'r2',
+  'l', "l'", 'l2',
+  'u', "u'", 'u2',
+  'd', "d'", 'd2',
+  'f', "f'", 'f2',
+  'b', "b'", 'b2',
+];
+
 const MOVES_PYRAMINX = [
   'U', "U'", 'L', "L'", 'R', "R'", 'B', "B'",
   'u', "u'", 'l', "l'", 'r', "r'", 'b', "b'",
@@ -50,7 +80,7 @@ const MOVES_PYRAMINX = [
 
 export default function ArrowGalleryScreen() {
   const router = useRouter();
-  const [selectedPuzzle, setSelectedPuzzle] = useState<'3x3' | '2x2' | 'pyraminx'>('3x3');
+  const [selectedPuzzle, setSelectedPuzzle] = useState<'3x3' | '2x2' | '4x4' | 'pyraminx'>('3x3');
   const [activePlayMove, setActivePlayMove] = useState<string | null>(null);
   const [subGroup, setSubGroup] = useState<string>('R');
 
@@ -59,21 +89,27 @@ export default function ArrowGalleryScreen() {
     ? ['R', 'L', 'U', 'D', 'F', 'B']
     : selectedPuzzle === '2x2'
     ? ['R', 'U', 'F']
+    : selectedPuzzle === '4x4'
+    ? ['Outer', 'Wide', 'Slice']
     : ['Corners', 'Tips'];
 
   const allMoves = selectedPuzzle === '3x3'
     ? MOVES_3X3
     : selectedPuzzle === '2x2'
     ? MOVES_2X2
+    : selectedPuzzle === '4x4'
+    ? (subGroup === 'Wide' ? MOVES_4X4_WIDE : subGroup === 'Slice' ? MOVES_4X4_INNER : MOVES_4X4_OUTER)
     : MOVES_PYRAMINX;
 
-  const moves = allMoves.filter((m) => {
-    if (selectedPuzzle === 'pyraminx') {
-      const isTip = m[0] === m[0].toLowerCase();
-      return subGroup === 'Tips' ? isTip : !isTip;
-    }
-    return m.startsWith(subGroup);
-  });
+  const moves = selectedPuzzle === '4x4'
+    ? allMoves.slice(0, 6) // Display top 6 moves per subgroup to avoid WebGL context limit
+    : allMoves.filter((m) => {
+        if (selectedPuzzle === 'pyraminx') {
+          const isTip = m[0] === m[0].toLowerCase();
+          return subGroup === 'Tips' ? isTip : !isTip;
+        }
+        return m.startsWith(subGroup);
+      });
 
   // Fixed camera positions for gallery cards:
   const cubeCam = { az: 0.6, el: 0.45 };
@@ -108,7 +144,7 @@ export default function ArrowGalleryScreen() {
 
       {/* Puzzle Tabs */}
       <View style={styles.tabsRow}>
-        {(['3x3', '2x2', 'pyraminx'] as const).map((p) => {
+        {(['3x3', '2x2', '4x4', 'pyraminx'] as const).map((p) => {
           const isSelected = selectedPuzzle === p;
           return (
             <TouchableOpacity
@@ -116,7 +152,7 @@ export default function ArrowGalleryScreen() {
               style={[styles.tabBtn, isSelected && styles.tabBtnActive]}
               onPress={() => {
                 setSelectedPuzzle(p);
-                setSubGroup(p === 'pyraminx' ? 'Corners' : 'R');
+                setSubGroup(p === 'pyraminx' ? 'Corners' : p === '4x4' ? 'Outer' : 'R');
                 setActivePlayMove(null);
               }}
             >
@@ -142,7 +178,7 @@ export default function ArrowGalleryScreen() {
               }}
             >
               <Text style={[styles.subGroupText, isSelected && styles.subGroupTextActive]}>
-                {selectedPuzzle === 'pyraminx' ? grp : `${grp} Face`}
+                {selectedPuzzle === 'pyraminx' || selectedPuzzle === '4x4' ? grp : `${grp} Face`}
               </Text>
             </TouchableOpacity>
           );
@@ -194,8 +230,14 @@ export default function ArrowGalleryScreen() {
                       />
                     ) : (
                       <PuzzleCube3D
-                        cubeState={selectedPuzzle === '2x2' ? DEFAULT_2X2_SOLVED : DEFAULT_3X3_SOLVED}
-                        dimension={selectedPuzzle === '2x2' ? 2 : 3}
+                        cubeState={
+                          selectedPuzzle === '2x2'
+                            ? DEFAULT_2X2_SOLVED
+                            : selectedPuzzle === '4x4'
+                            ? DEFAULT_4X4_SOLVED
+                            : DEFAULT_3X3_SOLVED
+                        }
+                        dimension={selectedPuzzle === '2x2' ? 2 : selectedPuzzle === '4x4' ? 4 : 3}
                         currentMoveNotation={move}
                         isAnimating={false}
                         isGhostPreview={isPlaying}

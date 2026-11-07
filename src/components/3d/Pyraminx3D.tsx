@@ -157,10 +157,10 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
     return { stationaryPieces: stat, rotatingPieces: rot };
   }, [pieceGeometries, isAnimating, isGhostPreview, turningPieceIds]);
 
-  // Lift offset for turning pieces (0.03 outwards along turning axis in waiting state, 0 when animating)
+  // Lift offset for turning pieces (0.08 outwards along turning axis in waiting state, 0 when animating)
   const liftOffset: Vec3 = useMemo(() => {
     if (isSolved || !currentMoveNotation || isAnimating) return [0, 0, 0];
-    return scale(normalize(turnAxis), 0.03);
+    return scale(normalize(turnAxis), 0.08);
   }, [isSolved, currentMoveNotation, turnAxis, isAnimating]);
 
   // Check if a sticker is in offendingStickers

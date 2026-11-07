@@ -198,26 +198,67 @@ export const usePuzzleStore = create<PuzzleStoreState>((set, get) => ({
       return false;
     }
 
+    // Check if input is already solved upfront
+    if (puzzle.isSolved(currentState)) {
+      set({
+        isSolving: false,
+        solutionMoves: [],
+        currentMoveIndex: 0,
+        isPlaying: false,
+        showSolvedCelebration: true,
+        solveError: null,
+      });
+      return true;
+    }
+
     set({ isSolving: true, solveError: null });
 
     try {
       // Run solver
       const moves = await puzzle.solve(currentState);
+
+      // Verify that replaying all moves yields a solved state
+      let replayState = puzzle.cloneState(currentState);
+      for (const m of moves) {
+        replayState = puzzle.applyMove(replayState, m);
+      }
+      const isReplaySolved = puzzle.isSolved(replayState);
+
+      if (moves.length === 0 || !isReplaySolved) {
+        hapticFeedback.error();
+        set({
+          isSolving: false,
+          solutionMoves: [],
+          currentMoveIndex: 0,
+          isPlaying: false,
+          showSolvedCelebration: false,
+          solveError: {
+            error: 'We could not solve this yet',
+            details: 'The solver could not find a complete solution for this cube configuration.',
+          },
+        });
+        return false;
+      }
+
       hapticFeedback.success();
       set({
         isSolving: false,
         solutionMoves: moves,
         currentMoveIndex: 0,
         isPlaying: false,
-        showSolvedCelebration: moves.length === 0,
+        showSolvedCelebration: false,
       });
       return true;
     } catch (err: any) {
       hapticFeedback.error();
       set({
         isSolving: false,
+        solutionMoves: [],
+        currentMoveIndex: 0,
+        isPlaying: false,
+        showSolvedCelebration: false,
         solveError: {
-          error: 'Solver Error',
+          error: 'We could not solve this yet',
           details: err.message || 'Unable to find a solution for this puzzle state.',
         },
       });

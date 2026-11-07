@@ -17,6 +17,7 @@ import {
   RotateCcw,
   Gauge,
   CheckCircle2,
+  AlertCircle,
   ArrowLeft,
   HelpCircle,
   Settings,
@@ -72,7 +73,16 @@ export default function SolutionPlayerScreen() {
   const showColorBlindLetters = useSettingsStore((s) => s.showColorBlindLetters);
 
   const totalMoves = solutionMoves.length;
-  const isSolved = currentMoveIndex >= totalMoves;
+  const puzzle = useMemo(() => getPuzzle(activePuzzleId), [activePuzzleId]);
+  const isStateLogicallySolved = useMemo(() => {
+    return puzzle.isSolved(currentState);
+  }, [puzzle, currentState]);
+
+  const isAlreadySolved = totalMoves === 0 && isStateLogicallySolved;
+  const isCouldNotSolve = totalMoves === 0 && !isStateLogicallySolved;
+  const isFullyCompletedAndSolved = totalMoves > 0 && currentMoveIndex >= totalMoves && isStateLogicallySolved;
+  const isUnfinishedOrFailed = totalMoves > 0 && currentMoveIndex >= totalMoves && !isStateLogicallySolved;
+  const isSolved = isAlreadySolved || isFullyCompletedAndSolved || isCouldNotSolve || isUnfinishedOrFailed;
   const movesRemaining = Math.max(0, totalMoves - currentMoveIndex);
   const currentMoveNotation = !isSolved ? solutionMoves[currentMoveIndex]?.notation || null : null;
   const isDouble = currentMoveNotation ? currentMoveNotation.includes('2') : false;
@@ -494,7 +504,35 @@ export default function SolutionPlayerScreen() {
                 <Text style={styles.hintText}>{instructionInfo.hint}</Text>
               </View>
             </View>
-          ) : isSolved ? (
+          ) : isAlreadySolved ? (
+            <View style={styles.solvedCard}>
+              <CheckCircle2 color="#10B981" size={48} strokeWidth={2.5} />
+              <Text style={styles.solvedTitle}>Your cube is already solved</Text>
+              <Text style={styles.solvedSubtitle}>
+                All faces match. No moves needed!
+              </Text>
+              <TouchableOpacity
+                style={styles.solveAnotherBtn}
+                onPress={handleSolveAnother}
+              >
+                <Text style={styles.solveAnotherText}>Solve another puzzle</Text>
+              </TouchableOpacity>
+            </View>
+          ) : isCouldNotSolve || isUnfinishedOrFailed ? (
+            <View style={styles.solvedCard}>
+              <AlertCircle color="#EF4444" size={48} strokeWidth={2.5} />
+              <Text style={[styles.solvedTitle, { color: '#EF4444' }]}>We could not solve this yet</Text>
+              <Text style={styles.solvedSubtitle}>
+                The solver could not find a complete solution for this cube configuration.
+              </Text>
+              <TouchableOpacity
+                style={styles.solveAnotherBtn}
+                onPress={handleSolveAnother}
+              >
+                <Text style={styles.solveAnotherText}>Try another puzzle</Text>
+              </TouchableOpacity>
+            </View>
+          ) : isFullyCompletedAndSolved ? (
             <View style={styles.solvedCard}>
               <CheckCircle2 color="#10B981" size={48} strokeWidth={2.5} />
               <Text style={styles.solvedTitle}>Your cube is solved!</Text>

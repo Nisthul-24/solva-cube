@@ -1,3 +1,4 @@
+import Cube from 'cubejs';
 import {
   Puzzle,
   PuzzleId,
@@ -5,12 +6,10 @@ import {
   Move,
   ValidationResult,
   FaceLayout,
+  CubeColor,
 } from '../../types/puzzle';
-import { CubeColor } from '../../types/puzzle';
 import { FaceName3x3 } from '../../components/3d/cubieModel';
-import {
-  Cube4x4State,
-} from './cube4x4Types';
+import { Cube4x4State } from './cube4x4Types';
 import {
   CUBE4X4_FACES,
   getStandardSolved4x4State,
@@ -18,8 +17,54 @@ import {
   turnInfo4x4,
   generate4x4RandomScramble,
   deriveColorSchemeFromCorners,
-  CORNERS_4X4,
 } from './cube4x4Geometry';
+import { solve4x4Centres } from './cube4x4Centres';
+import { solve4x4Edges } from './cube4x4Edges';
+
+export const OLL_PARITY_MACRO = [
+  'r2', 'B2', 'U2',
+  'l', 'U2',
+  "r'", 'U2',
+  'r', 'U2',
+  'F2', 'r', 'F2',
+  "l'", 'B2',
+  'r2',
+];
+
+export const PLL_PARITY_MACRO = ['r2', 'U2', 'r2', 'Uw2', 'r2', 'u2'];
+
+export function getFaceColorsFromCentres(state: Cube4x4State): Record<FaceName3x3, CubeColor> {
+  return {
+    U: state.U[5],
+    R: state.R[5],
+    F: state.F[5],
+    D: state.D[5],
+    L: state.L[5],
+    B: state.B[5],
+  };
+}
+
+export function stateToCubejsString4x4(state: Cube4x4State): string {
+  const faceColors = getFaceColorsFromCentres(state);
+  const colorToChar: Record<string, string> = {};
+  for (const [face, color] of Object.entries(faceColors)) {
+    colorToChar[color] = face;
+  }
+
+  const FACES: FaceName3x3[] = ['U', 'R', 'F', 'D', 'L', 'B'];
+  let res = '';
+
+  for (const f of FACES) {
+    const s = state[f];
+    const indices = [0, 1, 3, 4, 5, 7, 12, 13, 15];
+    for (const idx of indices) {
+      const col = s[idx];
+      res += colorToChar[col] || 'U';
+    }
+  }
+
+  return res;
+}
 
 export class Cube4x4Solver implements Puzzle<Cube4x4State> {
   id: PuzzleId = '4x4';
@@ -147,8 +192,83 @@ export class Cube4x4Solver implements Puzzle<Cube4x4State> {
   }
 
   async solve(state: Cube4x4State): Promise<Move[]> {
-    // Phase 4a is WITHOUT a solver (solver stages built in 4b, 4c, 4d)
-    return [];
+    if (this.isSolved(state)) return [];
+
+    Cube.initSolver();
+
+    let cur = this.cloneState(state);
+    const moves: Move[] = [];
+
+    function addMove(notation: string, stage: string) {
+      cur = apply4x4Move(cur, notation);
+      const t = turnInfo4x4(notation);
+      moves.push({
+        notation,
+        face: notation[0].toUpperCase(),
+        direction: t.direction,
+        amount: t.direction === 'DOUBLE' ? 2 : t.direction === 'CCW' ? -1 : 1,
+        description: t.wording,
+        stage,
+      });
+    }
+
+    // Stage 1: Build the Centres
+    const scheme = deriveColorSchemeFromCorners(cur);
+    const { moves: centreMoves } = solve4x4Centres(cur, scheme.faceColors);
+    for (const m of centreMoves) {
+      addMove(m.notation, 'Stage 1 of 4: Build the Centres');
+    }
+
+    // Stage 2: Pair all 12 Edges
+    const { moves: edgeMoves } = solve4x4Edges(cur, getFaceColorsFromCentres(cur));
+    for (const m of edgeMoves) {
+      addMove(m.notation, 'Stage 2 of 4: Pair all 12 Edges');
+    }
+
+    // Stage 3 & 4: 3x3 Phase & Parities
+    const parityAttempts: { name: string; seq: string[]; isParity: boolean }[] = [
+      { name: 'None', seq: [], isParity: false },
+      { name: 'OLL Parity', seq: OLL_PARITY_MACRO, isParity: true },
+      { name: 'PLL Parity', seq: PLL_PARITY_MACRO, isParity: true },
+      { name: 'Both Parities', seq: [...OLL_PARITY_MACRO, ...PLL_PARITY_MACRO], isParity: true },
+    ];
+
+    let solved = false;
+    for (const attempt of parityAttempts) {
+      let testState = cur;
+      for (const m of attempt.seq) testState = apply4x4Move(testState, m);
+
+      try {
+        const cubeStr = stateToCubejsString4x4(testState);
+        const c = Cube.fromString(cubeStr);
+        const sol = c.solve();
+        if (sol !== null && sol !== undefined) {
+          const moves3x3 = sol.trim().split(/\s+/).filter(Boolean);
+          let sim = testState;
+          for (const m of moves3x3) sim = apply4x4Move(sim, m);
+
+          if (this.isSolved(sim)) {
+            // Apply parity moves if any
+            for (const m of attempt.seq) {
+              addMove(m, 'Stage 4 of 4: Parity Fix');
+            }
+            // Apply 3x3 phase moves
+            for (const m of moves3x3) {
+              addMove(m, 'Stage 3 of 4: 3x3 Reduction Phase');
+            }
+            solved = true;
+            break;
+          }
+        }
+      } catch (e: any) {
+        // Parity mismatch, try next
+      }
+    }
+
+    if (!solved) {
+      throw new Error('Could not reduce 4x4 to 3x3 or resolve parities.');
+    }
+
+    return moves;
   }
 }
-
