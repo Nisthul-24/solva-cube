@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry';
 import { Axis } from './cubieModel';
 import { HighlightStyleOption } from '../../store/settingsStore';
+import { getPuzzleEngine } from '../../puzzleEngine/puzzleEngine';
 
 export interface LayerBelt3DProps {
   puzzleType: '3x3' | '2x2' | '4x4' | 'pyraminx';
@@ -270,41 +271,22 @@ export const LayerBelt3D: React.FC<LayerBelt3DProps> = ({
       else if (letter === 'B') { axis = 'z'; slabMin = -1.0; slabMax = 0; }
     } else if (puzzleType === '4x4') {
       cubeHalfWidth = 2.0; // In unscaled 4x4 group
-      const letter = cleanMove[0];
-      const isWide = cleanMove.includes('w');
-      const isInner = letter === letter.toLowerCase();
-      const upper = letter.toUpperCase();
-
-      if (upper === 'R') {
-        axis = 'x';
-        if (isWide) { slabMin = 0; slabMax = 2.0; }
-        else if (isInner) { slabMin = 0; slabMax = 1.0; }
-        else { slabMin = 1.0; slabMax = 2.0; }
-      } else if (upper === 'L') {
-        axis = 'x';
-        if (isWide) { slabMin = -2.0; slabMax = 0; }
-        else if (isInner) { slabMin = -1.0; slabMax = 0; }
-        else { slabMin = -2.0; slabMax = -1.0; }
-      } else if (upper === 'U') {
-        axis = 'y';
-        if (isWide) { slabMin = 0; slabMax = 2.0; }
-        else if (isInner) { slabMin = 0; slabMax = 1.0; }
-        else { slabMin = 1.0; slabMax = 2.0; }
-      } else if (upper === 'D') {
-        axis = 'y';
-        if (isWide) { slabMin = -2.0; slabMax = 0; }
-        else if (isInner) { slabMin = -1.0; slabMax = 0; }
-        else { slabMin = -2.0; slabMax = -1.0; }
-      } else if (upper === 'F') {
-        axis = 'z';
-        if (isWide) { slabMin = 0; slabMax = 2.0; }
-        else if (isInner) { slabMin = 0; slabMax = 1.0; }
-        else { slabMin = 1.0; slabMax = 2.0; }
-      } else if (upper === 'B') {
-        axis = 'z';
-        if (isWide) { slabMin = -2.0; slabMax = 0; }
-        else if (isInner) { slabMin = -1.0; slabMax = 0; }
-        else { slabMin = -2.0; slabMax = -1.0; }
+      const eng = getPuzzleEngine('4x4');
+      const m = eng.getMove(cleanMove);
+      if (m && m.axisName) {
+        axis = m.axisName;
+        const axisIdx = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
+        let minC = Infinity;
+        let maxC = -Infinity;
+        for (const p of eng.pieces) {
+          if (m.turningPieceSet.has(p.id)) {
+            const c = p.homeCentroid[axisIdx];
+            if (c < minC) minC = c;
+            if (c > maxC) maxC = c;
+          }
+        }
+        slabMin = minC - 0.5;
+        slabMax = maxC + 0.5;
       }
     } else {
       // 3x3

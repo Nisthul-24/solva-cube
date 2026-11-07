@@ -24,6 +24,7 @@ import {
   get4x4MovePermutation,
   STICKER_LAYOUT_4X4,
 } from '../../solvers/cube4x4/cube4x4Geometry';
+import { getPuzzleEngine } from '../../puzzleEngine/puzzleEngine';
 
 export { STICKER_LAYOUT_3D, CUBE_MOVE_PERMUTATIONS, STICKER_LAYOUT_4X4 };
 
@@ -259,183 +260,111 @@ export function getPuzzleTurnInfo(
   const clean = moveNotation.trim();
 
   // ==========================================
-  // 4x4 REVENGE CUBE
+  // 4x4 REVENGE CUBE (Delegated to puzzleEngine single source of truth)
   // ==========================================
   if (puzzleId === '4x4') {
-    const t4 = turnInfo4x4(clean);
-    const face = clean[0].toUpperCase() as FaceName3x3;
-    const isDouble = clean.includes('2');
+    const eng = getPuzzleEngine('4x4');
+    const m = eng.getMove(clean);
+    if (m) {
+      const A = m.axis;
+      const arcCenter = m.arrowCenter;
+      const angleRad = m.angle;
+      const isDouble = m.isDouble;
+      const layerName = m.layerName;
+      const arcRadius = m.arrowRadius;
+      const arrow = m.arrow;
 
-    // Global positive axis: +x, +y, +z strictly from 3D geometry
-    const axisVec: Vec3 = t4.axis === 'x' ? [1, 0, 0] : t4.axis === 'y' ? [0, 1, 0] : [0, 0, 1];
-    const A = axisVec;
-    const { U, V } = getOrthonormalBasis(A);
-    const angleRad = t4.angle;
+      const faceUpper = clean[0].toUpperCase();
+      const faceOffsets: Record<string, number> = { U: 0, R: 16, F: 32, D: 48, L: 64, B: 80 };
+      const startIdx = faceOffsets[faceUpper] ?? 0;
+      const destIdx = m.permutation[startIdx] ?? startIdx;
+      const startSt = STICKER_LAYOUT_4X4[startIdx];
+      const destSt = STICKER_LAYOUT_4X4[destIdx];
 
-    // Mid-plane along axis:
-    // layers indices: 0 -> -1.5, 1 -> -0.5, 2 -> 0.5, 3 -> 1.5
-    const layerCoords = [-1.5, -0.5, 0.5, 1.5];
-    const meanCoord = t4.layers.reduce((sum, l) => sum + layerCoords[l], 0) / t4.layers.length;
-    const arcCenter = scale(A, meanCoord);
+      const startPos: Vec3 = startSt ? (startSt.center as Vec3) : (arrow.arcPoints[0] || arcCenter);
+      const destPos: Vec3 = destSt ? (destSt.center as Vec3) : rotateAroundAxis(startPos, A, angleRad);
+      const dashedArcPoints = createCurvedDashedLine(startPos, A, angleRad);
 
-    // Orbit arrow radius: 1.18 x half-diagonal of cross section (2.0 * sqrt(2))
-    const arcRadius = 1.18 * (2.0 * Math.SQRT2); // ~3.3375
-    const ribbonWidth = 0.22;
-    const headLength = 0.70;
-    const headWidth = 0.44;
-    const sweepSpan = isDouble ? (220 * Math.PI) / 180 : (110 * Math.PI) / 180;
-
-    const arrow = buildOrbitArrow(
-      arcCenter,
-      A,
-      U,
-      V,
-      arcRadius,
-      angleRad,
-      ribbonWidth,
-      headLength,
-      headWidth,
-      sweepSpan
-    );
-
-    const faceOffsets: Record<FaceName3x3, number> = {
-      U: 0,
-      R: 16,
-      F: 32,
-      D: 48,
-      L: 64,
-      B: 80,
-    };
-    const perm = get4x4MovePermutation(clean);
-    const startIdx = faceOffsets[face] ?? 0;
-    const destIdx = perm[startIdx] ?? startIdx;
-
-    const startSt = STICKER_LAYOUT_4X4[startIdx];
-    const destSt = STICKER_LAYOUT_4X4[destIdx];
-
-    const startPos: Vec3 = startSt ? (startSt.center as Vec3) : add(arcCenter, scale(U, arcRadius));
-    const destPos: Vec3 = destSt ? (destSt.center as Vec3) : rotateAroundAxis(startPos, A, angleRad);
-    const dashedArcPoints = createCurvedDashedLine(startPos, A, angleRad);
-
-    return {
-      puzzleId: '4x4',
-      move: clean,
-      axis: A,
-      axisPoint: arcCenter,
-      angleRad,
-      isDouble,
-      isTipOnly: false,
-      layerName: t4.layerName,
-      arcCenter,
-      arcRadius,
-      arcPoints: arrow.arcPoints,
-      endTangent: arrow.endTangent,
-      arrowhead: arrow.arrowhead,
-      ribbonPositions: arrow.ribbonPositions,
-      ribbonOutlinePositions: arrow.ribbonOutlinePositions,
-      headPositions: arrow.headPositions,
-      headOutlinePositions: arrow.headOutlinePositions,
-      refSticker: {
-        startPos,
-        destPos,
-        dashedArcPoints,
-      },
-    };
+      return {
+        puzzleId: '4x4',
+        move: clean,
+        axis: A,
+        axisPoint: arcCenter,
+        angleRad,
+        isDouble,
+        isTipOnly: false,
+        layerName,
+        arcCenter,
+        arcRadius,
+        arcPoints: arrow.arcPoints,
+        endTangent: arrow.endTangent,
+        arrowhead: arrow.arrowhead,
+        ribbonPositions: arrow.ribbonPositions,
+        ribbonOutlinePositions: arrow.ribbonOutlinePositions,
+        headPositions: arrow.headPositions,
+        headOutlinePositions: arrow.headOutlinePositions,
+        refSticker: {
+          startPos,
+          destPos,
+          dashedArcPoints,
+        },
+      };
+    }
   }
 
   // ==========================================
-  // PYRAMINX
+  // PYRAMINX (Delegated to puzzleEngine single source of truth)
   // ==========================================
   if (puzzleId === 'pyraminx') {
-    const vKey = clean[0].toUpperCase() as 'U' | 'L' | 'R' | 'B';
-    const isTipOnly = clean[0] === clean[0].toLowerCase();
-    const isCCW = clean.includes("'");
-    const angleRad = (isCCW ? 120 : -120) * (Math.PI / 180);
+    const eng = getPuzzleEngine('pyraminx');
+    const m = eng.getMove(clean);
+    if (m) {
+      const A = m.axis;
+      const arcCenter = m.arrowCenter;
+      const angleRad = m.angle;
+      const isDouble = m.isDouble;
+      const isTipOnly = clean[0] === clean[0].toLowerCase();
+      const layerName = m.layerName;
+      const arcRadius = m.arrowRadius;
+      const arrow = m.arrow;
 
-    const vertex = PYRAMINX_VERTICES[vKey];
-    const A = normalize(vertex);
-    const { U, V } = getOrthonormalBasis(A);
+      const vKey = clean[0].toUpperCase() as 'U' | 'L' | 'R' | 'B';
+      const refStickerIdx = isTipOnly
+        ? (vKey === 'U' ? 0 : vKey === 'L' ? 4 : vKey === 'R' ? 8 : 17)
+        : (vKey === 'U' ? 2 : vKey === 'L' ? 5 : vKey === 'R' ? 7 : 16);
+      const destIdx = m.permutation[refStickerIdx] ?? refStickerIdx;
+      const startSt = PYRAMINX_STICKERS_3D[refStickerIdx];
+      const destSt = PYRAMINX_STICKERS_3D[destIdx];
 
-    // Layer wording
-    const vNames: Record<'U' | 'L' | 'R' | 'B', string> = {
-      U: 'Top',
-      L: 'Bottom-left',
-      R: 'Bottom-right',
-      B: 'Back',
-    };
-    const layerName = `${vNames[vKey]} ${isTipOnly ? 'tip' : 'corner'}`;
+      const startPos: Vec3 = startSt ? startSt.centroid : (arrow.arcPoints[0] || arcCenter);
+      const destPos: Vec3 = destSt ? destSt.centroid : rotateAroundAxis(startPos, A, angleRad);
+      const dashedArcPoints = createCurvedDashedLine(startPos, A, angleRad);
 
-    // Orbit arrow placement for Pyraminx:
-    // Midpoint of turning cap along vertex axis
-    // Uppercase cap extends from t=1/3 to 1.0 (midpoint t=2/3 of sqrt(3) ~ 1.1547)
-    // Lowercase tip cap extends from t=2/3 to 1.0 (midpoint t=5/6 of sqrt(3) ~ 1.4434)
-    const h = Math.sqrt(3);
-    const d = isTipOnly ? (5 / 6) * h : (2 / 3) * h;
-    const arcCenter = scale(A, d);
-
-    // Orbit arrow radius: 1.25 x circumradius of cut-plane cross section
-    // Uppercase circumradius Rc ~ 1.08866 -> radius = 1.25 * 1.08866 ~ 1.361
-    // Lowercase circumradius Rc ~ 0.54433 -> radius = 1.25 * 0.54433 ~ 0.680
-    const arcRadius = isTipOnly ? 1.25 * 0.54433 : 1.25 * 1.08866;
-    const ribbonWidth = isTipOnly ? 0.08 : 0.11;
-    const headLength = isTipOnly ? 0.26 : 0.35;
-    const headWidth = isTipOnly ? 0.16 : 0.22;
-    const sweepSpan = (120 * Math.PI) / 180;
-
-    const arrow = buildOrbitArrow(
-      arcCenter,
-      A,
-      U,
-      V,
-      arcRadius,
-      angleRad,
-      ribbonWidth,
-      headLength,
-      headWidth,
-      sweepSpan
-    );
-
-    // Reference sticker start and destination
-    // Pick first sticker on this corner/layer
-    const refStickerIdx = isTipOnly
-      ? (vKey === 'U' ? 0 : vKey === 'L' ? 4 : vKey === 'R' ? 8 : 17) // Tip sticker
-      : (vKey === 'U' ? 2 : vKey === 'L' ? 5 : vKey === 'R' ? 7 : 16); // Axial sticker
-
-    const perm = PYRAMINX_MOVE_PERMUTATIONS[clean] || [];
-    const destIdx = perm[refStickerIdx] ?? refStickerIdx;
-
-    const startSt = PYRAMINX_STICKERS_3D[refStickerIdx];
-    const destSt = PYRAMINX_STICKERS_3D[destIdx];
-
-    const startPos = startSt ? startSt.centroid : arcPointsOnRadius(arcCenter, U, arcRadius);
-    const destPos = destSt ? destSt.centroid : rotateAroundAxis(startPos, A, angleRad);
-
-    const dashedArcPoints = createCurvedDashedLine(startPos, A, angleRad);
-
-    return {
-      puzzleId: 'pyraminx',
-      move: clean,
-      axis: A,
-      axisPoint: arcCenter,
-      angleRad,
-      isDouble: false,
-      isTipOnly,
-      layerName,
-      arcCenter,
-      arcRadius,
-      arcPoints: arrow.arcPoints,
-      endTangent: arrow.endTangent,
-      arrowhead: arrow.arrowhead,
-      ribbonPositions: arrow.ribbonPositions,
-      ribbonOutlinePositions: arrow.ribbonOutlinePositions,
-      headPositions: arrow.headPositions,
-      headOutlinePositions: arrow.headOutlinePositions,
-      refSticker: {
-        startPos,
-        destPos,
-        dashedArcPoints,
-      },
-    };
+      return {
+        puzzleId: 'pyraminx',
+        move: clean,
+        axis: A,
+        axisPoint: arcCenter,
+        angleRad,
+        isDouble,
+        isTipOnly,
+        layerName,
+        arcCenter,
+        arcRadius,
+        arcPoints: arrow.arcPoints,
+        endTangent: arrow.endTangent,
+        arrowhead: arrow.arrowhead,
+        ribbonPositions: arrow.ribbonPositions,
+        ribbonOutlinePositions: arrow.ribbonOutlinePositions,
+        headPositions: arrow.headPositions,
+        headOutlinePositions: arrow.headOutlinePositions,
+        refSticker: {
+          startPos,
+          destPos,
+          dashedArcPoints,
+        },
+      };
+    }
   }
 
   // ==========================================

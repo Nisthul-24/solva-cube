@@ -39,8 +39,7 @@ import { UI_COLORS } from '../src/constants/colors';
 import { adService } from '../src/services/adService';
 import { hapticFeedback } from '../src/services/hapticsService';
 import { getMoveInstructionInfo } from '../src/components/3d/cubieModel';
-import { PYRAMINX_WORDINGS } from '../src/solvers/pyraminx/pyraminxSolver';
-import { turnInfo4x4 } from '../src/solvers/cube4x4/cube4x4Geometry';
+import { wording as getEngineWording } from '../src/puzzleEngine/puzzleEngine';
 import { getPuzzle } from '../src/solvers';
 import { Cube3x3State } from '../src/solvers/cube3x3/cube3x3Facelets';
 import { getFrontMovementHint } from '../src/components/3d/puzzleTurnInfo';
@@ -204,11 +203,11 @@ export default function SolutionPlayerScreen() {
 
     if (activePuzzleId === '4x4') {
       const curMoveObj = solutionMoves[currentMoveIndex];
-      const t4 = turnInfo4x4(currentMoveNotation);
-      const moveDesc = curMoveObj?.description || t4.wording;
+      const info = getEngineWording('4x4', currentMoveNotation);
+      const moveDesc = curMoveObj?.description || info.fullInstruction;
       return {
         move: currentMoveNotation,
-        boldLayer: t4.layerName,
+        boldLayer: info.layerName,
         actionText: '',
         hint: frontMovementHint || 'Follow the 3D direction arrow.',
         centerColor: '',
@@ -219,15 +218,13 @@ export default function SolutionPlayerScreen() {
     }
     if (activePuzzleId === 'pyraminx') {
       const curMoveObj = solutionMoves[currentMoveIndex];
-      const moveDesc = curMoveObj?.description || PYRAMINX_WORDINGS[currentMoveNotation]?.action || `Turn move ${currentMoveNotation}`;
-      const isTip = currentMoveNotation[0] === currentMoveNotation[0].toLowerCase();
-      const vKey = currentMoveNotation[0].toUpperCase();
-      const vName = vKey === 'U' ? 'TOP' : vKey === 'L' ? 'LEFT' : vKey === 'R' ? 'RIGHT' : 'BACK';
+      const info = getEngineWording('pyraminx', currentMoveNotation);
+      const moveDesc = curMoveObj?.description || info.fullInstruction;
       return {
         move: currentMoveNotation,
-        boldLayer: `${vName} ${isTip ? 'tip' : 'corner'}`,
+        boldLayer: info.layerName,
         actionText: '',
-        hint: frontMovementHint || PYRAMINX_WORDINGS[currentMoveNotation]?.hint || 'Follow the 3D direction arrow.',
+        hint: frontMovementHint || 'Follow the 3D direction arrow.',
         centerColor: '',
         centerColorHex: 'transparent',
         fullAction: moveDesc,

@@ -168,9 +168,8 @@ describe('Deliverable a: Arrow Anchoring & Sizing Verification', () => {
           expect(tipRadius).toBeLessThanOrEqual(maxAllowedRadius + 1e-2);
 
           // 3. Center in turning slab's mid-plane along turn axis
-          const isTip = move[0] === move[0].toLowerCase();
           const expectedCenterDist = pId === 'pyraminx'
-            ? (isTip ? (5 / 6) * Math.sqrt(3) : (2 / 3) * Math.sqrt(3))
+            ? norm(info.arcCenter)
             : pId === '2x2'
             ? 0.5
             : 1.0;

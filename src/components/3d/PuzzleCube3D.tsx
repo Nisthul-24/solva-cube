@@ -18,7 +18,7 @@ import { TurnArrowRibbon3D } from './TurnArrowRibbon3D';
 import { LayerBelt3D } from './LayerBelt3D';
 import { CameraRig } from './CameraRig';
 import { getPuzzleTurnInfo } from './puzzleTurnInfo';
-import { turnInfo4x4 } from '../../solvers/cube4x4/cube4x4Geometry';
+import { getPuzzleEngine } from '../../puzzleEngine/puzzleEngine';
 import { AutoViewOption, HighlightStyleOption } from '../../store/settingsStore';
 import { CubeColor } from '../../types/puzzle';
 
@@ -214,16 +214,19 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
     };
   }, []);
 
-  // Parse active move (Single source of truth via turnInfo)
+  // Parse active move (Single source of truth via turnInfo for 3x3/2x2, puzzleEngine for 4x4)
   const activeTurnInfo = useMemo(() => {
     if (!currentMoveNotation || isSolved) return null;
     if (dimension === 4) {
-      const t4 = turnInfo4x4(currentMoveNotation);
+      const eng = getPuzzleEngine('4x4');
+      const m = eng.getMove(currentMoveNotation);
+      if (!m) return null;
       return {
-        axis: t4.axis,
-        layers: t4.layers,
-        angle: t4.angle,
+        axis: m.axisName || 'y',
+        layers: (m.axisName === 'x' ? [Math.round(m.layerCentroid[0] + 1.5)] : m.axisName === 'y' ? [Math.round(m.layerCentroid[1] + 1.5)] : [Math.round(m.layerCentroid[2] + 1.5)]),
+        angle: m.angle,
         is4x4: true,
+        turningPieceSet: m.turningPieceSet,
       };
     }
     return turnInfo(currentMoveNotation);
@@ -231,7 +234,9 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
 
   const activeAxis = activeTurnInfo?.axis || 'y';
   const activeLayer = (activeTurnInfo as any)?.layer ?? 1;
-  const activeLayers: number[] = (activeTurnInfo as any)?.layers ?? (activeLayer === 1 ? [1] : [-1]);
+  const activeLayers = useMemo<number[]>(() => {
+    return (activeTurnInfo as any)?.layers ?? (activeLayer === 1 ? [1] : [-1]);
+  }, [activeTurnInfo, activeLayer]);
   const targetAngle = activeTurnInfo?.angle || 0;
   const currentFaceName = currentMoveNotation ? (currentMoveNotation[0].toUpperCase() as FaceName3x3) : activeFace;
 
@@ -374,14 +379,13 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
 
     if (dimension === 4) {
       const coords = [-1.5, -0.5, 0.5, 1.5];
+      const turningPieceSet = (activeTurnInfo as any)?.turningPieceSet as Set<string> | undefined;
+
       for (const x of coords) {
         for (const y of coords) {
           for (const z of coords) {
-            // Hide the 8 inner cubies (build only 56 outer cubies)
-            if (Math.abs(x) === 0.5 && Math.abs(y) === 0.5 && Math.abs(z) === 0.5) {
-              continue;
-            }
-
+            // Build ALL 64 cubies, including the 8 inner ones, as solid dark plastic
+            const id = `c4_${x}_${y}_${z}`;
             const stickers: any[] = [];
             const lx = Math.round(x + 1.5);
             const ly = Math.round(y + 1.5);
@@ -448,15 +452,10 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
               });
             }
 
-            let isLayer = false;
-            if (activeTurnInfo && !isSolved) {
-              if (activeAxis === 'x' && activeLayers.includes(lx)) isLayer = true;
-              if (activeAxis === 'y' && activeLayers.includes(ly)) isLayer = true;
-              if (activeAxis === 'z' && activeLayers.includes(lz)) isLayer = true;
-            }
+            const isLayer = Boolean(activeTurnInfo && !isSolved && turningPieceSet?.has(id));
 
             list.push({
-              id: `c4_${x}_${y}_${z}`,
+              id,
               x,
               y,
               z,
@@ -518,7 +517,7 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
       }
     }
     return list;
-  }, [cubeState, dimension, activeTurnInfo, isSolved, activeAxis, activeLayer, activeLayers]);
+  }, [cubeState, dimension, activeTurnInfo, isSolved, activeAxis, activeLayer]);
 
   const stationaryCubies = useMemo(
     () => allCubies.filter((c) => (!isAnimating && !isGhostPreview) || !c.isLayerActive),

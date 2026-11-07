@@ -13,9 +13,9 @@ import {
 } from '../../solvers/pyraminx/pyraminxGeometry';
 import {
   PYRAMINX_PIECES_14,
-  selectPyraminxPiecesForMove,
   PyraminxPieceDef,
 } from '../../solvers/pyraminx/pyraminxPieces';
+import { getPuzzleEngine } from '../../puzzleEngine/puzzleEngine';
 import { PALETTE, scaleBrightness } from './stickerLayout';
 import { AutoViewOption, HighlightStyleOption } from '../../store/settingsStore';
 import { TurnArrowRibbon3D } from './TurnArrowRibbon3D';
@@ -128,16 +128,20 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
     });
   }, []);
 
-  // Set of piece IDs turning in current move
+  // Set of piece IDs turning in current move (single source of truth from puzzleEngine)
   const { turningPieceIds, turnAxis, turnAngleRad } = useMemo(() => {
     if (!currentMoveNotation) {
       return { turningPieceIds: new Set<string>(), turnAxis: [0, 1, 0] as Vec3, turnAngleRad: 0 };
     }
-    const sel = selectPyraminxPiecesForMove(currentMoveNotation);
+    const eng = getPuzzleEngine('pyraminx');
+    const m = eng.getMove(currentMoveNotation);
+    if (!m) {
+      return { turningPieceIds: new Set<string>(), turnAxis: [0, 1, 0] as Vec3, turnAngleRad: 0 };
+    }
     return {
-      turningPieceIds: sel.turningPieceIds,
-      turnAxis: sel.axis,
-      turnAngleRad: sel.angleRad,
+      turningPieceIds: m.turningPieceSet,
+      turnAxis: m.axis,
+      turnAngleRad: m.angle,
     };
   }, [currentMoveNotation]);
 
