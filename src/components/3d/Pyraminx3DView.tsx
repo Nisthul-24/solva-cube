@@ -78,7 +78,7 @@ export const Pyraminx3DView: React.FC<Pyraminx3DViewProps> = ({
   }, [currentMoveNotation, isSolved]);
 
   const cameraPos = useMemo<Vec3>(() => {
-    const dist = 5.25;
+    const dist = 7.35;
     const cx = dist * Math.cos(elevation) * Math.sin(azimuth);
     const cy = dist * Math.sin(elevation);
     const cz = dist * Math.cos(elevation) * Math.cos(azimuth);
@@ -88,7 +88,7 @@ export const Pyraminx3DView: React.FC<Pyraminx3DViewProps> = ({
   const { handleBestView } = useBestView(
     'pyraminx',
     currentMoveNotation,
-    { azimuth, elevation, distance: 5.25 },
+    { azimuth, elevation, distance: 7.35 },
     useCallback((pose: { azimuth: number; elevation: number }) => {
       setAzimuth(pose.azimuth);
       setElevation(pose.elevation);
@@ -162,7 +162,10 @@ export const Pyraminx3DView: React.FC<Pyraminx3DViewProps> = ({
   return (
     <View style={[styles.container, style]} {...panResponder.panHandlers}>
       <CanvasErrorBoundary onResetCamera={handleResetView}>
-        <ThreeCanvas style={styles.canvas}>
+        <ThreeCanvas
+          style={styles.canvas}
+          camera={{ fov: 32 }}
+        >
           <Pyraminx3D
             state={state}
             activeFace={activeFace}

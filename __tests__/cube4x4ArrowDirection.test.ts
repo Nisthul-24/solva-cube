@@ -59,10 +59,10 @@ describe('4x4 Move Arrows: Render-Level Direction Test', () => {
       const pieceVelocity = scale(cross(axis, radiusVec), angleRad);
 
       for (const cam of CAM_DIRS) {
-        // Only evaluate views where the rotation is not edge-on and layer is facing camera
-        // Viewing dot:
-        const viewDot = Math.abs(dot(axis, cam));
-        if (viewDot < 0.25) continue; // too close to edge-on for this camera
+        // Only evaluate views where the layer faces the camera and is not edge-on
+        const faceNormal: Vec3 = (info as any).outwardNormal ? (info as any).outwardNormal : axis;
+        const viewDot = dot(faceNormal, cam);
+        if (viewDot < 0.25) continue; // facing away or too close to edge-on for this camera
 
         // Project arrow tangent and piece velocity onto camera screen plane
         const projArrow = normalize(projectToViewPlane(arrowTangent, cam));

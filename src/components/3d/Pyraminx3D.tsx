@@ -38,6 +38,7 @@ export interface Pyraminx3DProps {
   highlightStyle?: HighlightStyleOption;
   guidedMode?: boolean;
   isSolved?: boolean;
+  staticProgress?: number;
   offendingStickers?: OffendingStickerProp[];
   cameraAzimuth: number;
   cameraElevation: number;
@@ -74,6 +75,7 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
   highlightStyle = 'glass_belt',
   guidedMode = false,
   isSolved = false,
+  staticProgress,
   offendingStickers = [],
   cameraAzimuth,
   cameraElevation,
@@ -145,6 +147,9 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
     };
   }, [currentMoveNotation]);
 
+  const MODEL_SIZE_PYRAMINX = 2.8284;
+  const CAP_LIFT_AMOUNT = 0.0; // Section 2: No lift/gap - turning pieces rotate in place, allow no lift at all
+
   // Inverted hull material for outline pass (Requirement 3b)
   const invertedHullMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -162,7 +167,7 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
         }
       `,
       uniforms: {
-        offset: { value: 0.025 },
+        offset: { value: 0.02 * MODEL_SIZE_PYRAMINX },
         color: { value: new THREE.Color('#22d3ee') },
       },
       side: THREE.BackSide,
@@ -215,20 +220,12 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
       const progress = Math.min(1, elapsed / turnDurationMs);
       const eased = easeInOutCubic(progress);
 
-      // Requirement 3a: in waiting state, pieces lift 0.08 outwards.
-      // When turn starts, they ease back to 0 over the first 250ms of the turn as they rotate.
-      let lift = 0;
-      if (elapsed < 250) {
-        const easeBack = 1 - easeInOutCubic(elapsed / 250);
-        lift = 0.08 * easeBack;
-      }
-
-      pivotRef.current.position.copy(axisNorm.clone().multiplyScalar(lift));
+      // Part C item 3: No gap during turn (lift = 0, pieces rotate about vertex axis through tip)
+      pivotRef.current.position.set(0, 0, 0);
       pivotRef.current.setRotationFromAxisAngle(axisNorm, turnAngleRad * eased);
 
       if (progress >= 1) {
         animStartTime.current = null;
-        // STATE-DRIVEN RENDERING: reset pivot rotation to exact 0, detatch pieces, recolor from logical state
         pivotRef.current.position.set(0, 0, 0);
         pivotRef.current.setRotationFromAxisAngle(axisNorm, 0);
         onAnimationComplete?.();
@@ -248,25 +245,25 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
       }
       pivotRef.current.position.set(0, 0, 0);
       pivotRef.current.setRotationFromAxisAngle(axisNorm, angle);
+    } else if (staticProgress !== undefined && !isAnimating && !isGhostPreview && pivotRef.current && turnAngleRad !== 0) {
+      pivotRef.current.position.set(0, 0, 0);
+      pivotRef.current.setRotationFromAxisAngle(axisNorm, turnAngleRad * staticProgress);
     } else {
       animStartTime.current = null;
       if (pivotRef.current) {
-        // Requirement 3a: in waiting state, lift 0.08 outwards along vertex axis
-        if (currentMoveNotation && !isSolved) {
-          pivotRef.current.position.copy(axisNorm.clone().multiplyScalar(0.08));
-        } else {
-          pivotRef.current.position.set(0, 0, 0);
-        }
+        // Section 2: No lift/gap - turning pieces rotate about vertex axis in place with no lift at all
+        pivotRef.current.position.set(0, 0, 0);
         pivotRef.current.rotation.set(0, 0, 0);
       }
     }
 
-    // 4. Moving Layer Chip Projection
+    // 4. Moving Layer Chip Projection (anchored at C)
     if (onMovingChipChange) {
       if (currentMoveNotation && !isSolved) {
-        const unified = getPuzzleTurnInfo('pyraminx', currentMoveNotation);
-        const norm = new THREE.Vector3(...unified.axis);
-        const pos = new THREE.Vector3(...unified.axisPoint);
+        const eng = getPuzzleEngine('pyraminx');
+        const m = eng.getMove(currentMoveNotation);
+        const norm = m ? new THREE.Vector3(...m.axis).normalize() : new THREE.Vector3(0, 1, 0);
+        const pos = m ? new THREE.Vector3(...m.layerCentroid) : new THREE.Vector3(0, 0, 0);
         const camDir = new THREE.Vector3().subVectors(camera.position, pos).normalize();
         const dotVal = norm.dot(camDir);
         const isFacing = dotVal > -0.2;
@@ -278,7 +275,7 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
         const screenX = (proj.x * 0.5 + 0.5) * width;
         const screenY = (-proj.y * 0.5 + 0.5) * height;
         onMovingChipChange({
-          text: unified.layerName,
+          text: m ? m.layerName : '',
           screenX,
           screenY,
           visible: isFacing && !isAnimating,
@@ -307,6 +304,74 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
     [state, isSolved, currentMoveNotation]
   );
 
+  // Debug overlay data under ?debug=1 (Part C item 2)
+  const isDebug = typeof window !== 'undefined' && window.location?.search?.includes('debug=1');
+  const debugOverlayData = useMemo(() => {
+    if (!isDebug || !currentMoveNotation || isSolved) return null;
+    const eng = getPuzzleEngine('pyraminx');
+    const m = eng.getMove(currentMoveNotation);
+    if (!m) return null;
+
+    // 1. Axis line
+    const axisVec = new THREE.Vector3(...m.axis).normalize();
+    const axisPts = [
+      axisVec.clone().multiplyScalar(-3.0),
+      axisVec.clone().multiplyScalar(3.0),
+    ];
+    const axisLineGeom = new THREE.BufferGeometry().setFromPoints(axisPts);
+
+    // 2. Wireframe bounding box of moving set
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (const p of eng.pieces) {
+      if (m.turningPieceSet.has(p.id)) {
+        const [cx, cy, cz] = p.homeCentroid;
+        if (cx - 0.5 < minX) minX = cx - 0.5;
+        if (cx + 0.5 > maxX) maxX = cx + 0.5;
+        if (cy - 0.5 < minY) minY = cy - 0.5;
+        if (cy + 0.5 > maxY) maxY = cy + 0.5;
+        if (cz - 0.5 < minZ) minZ = cz - 0.5;
+        if (cz + 0.5 > maxZ) maxZ = cz + 0.5;
+      }
+    }
+    const boxSize: [number, number, number] = [maxX - minX + 0.04, maxY - minY + 0.04, maxZ - minZ + 0.04];
+    const boxCenter: [number, number, number] = [(minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2];
+    const boxGeom = new THREE.BoxGeometry(...boxSize);
+    const boxWireframeGeom = new THREE.WireframeGeometry(boxGeom);
+
+    // 3. Arrow center dot & line to layer centroid
+    const arrowCenterVec = new THREE.Vector3(...m.arrowCenter);
+    const layerCentroidVec = new THREE.Vector3(...m.layerCentroid);
+    const centerLineGeom = new THREE.BufferGeometry().setFromPoints([arrowCenterVec, layerCentroidVec]);
+
+    // 4. Arrow tangent
+    const centroid = new THREE.Vector3(...m.layerCentroid);
+    let nearestPt: THREE.Vector3 | null = null;
+    let minDist = Infinity;
+    for (const pt of m.arrow.arcPoints) {
+      const v = new THREE.Vector3(...pt);
+      const d = v.distanceTo(centroid);
+      if (d < minDist) {
+        minDist = d;
+        nearestPt = v;
+      }
+    }
+    const tangent = new THREE.Vector3(...m.arrow.endTangent).normalize();
+    const tangentEnd = nearestPt ? nearestPt.clone().addScaledVector(tangent, 0.8) : new THREE.Vector3();
+    const tangentLineGeom = nearestPt
+      ? new THREE.BufferGeometry().setFromPoints([nearestPt, tangentEnd])
+      : new THREE.BufferGeometry();
+
+    return {
+      axisLineGeom,
+      boxWireframeGeom,
+      boxCenter,
+      arrowCenterVec,
+      centerLineGeom,
+      tangentLineGeom,
+    };
+  }, [isDebug, currentMoveNotation, isSolved]);
+
   return (
     <>
       {/* Unified CameraRig owning camera pose with smooth slerp gliding */}
@@ -316,7 +381,7 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
         autoViewMode={autoViewMode}
         isSlowSpeed={turnDurationMs >= 2800}
         isAnimatingLayer={isAnimating}
-        baseDistance={5.25}
+        baseDistance={7.35}
         userAzimuth={cameraAzimuth}
         userElevation={cameraElevation}
         onCameraGlideComplete={onCameraMoveComplete}
@@ -422,6 +487,31 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
             move={currentMoveNotation}
             visible={!isAnimating}
           />
+        )}
+
+        {/* ?debug=1 Overlays under puzzle root */}
+        {isDebug && debugOverlayData && (
+          <group renderOrder={999}>
+            {/* 1. Axis Line (bright yellow) */}
+            <primitive object={new THREE.Line(debugOverlayData.axisLineGeom, new THREE.LineBasicMaterial({ color: '#fbbf24', depthTest: false }))} />
+
+            {/* 2. Wireframe Bounding Box of Moving Set (cyan/sky blue) */}
+            <group position={debugOverlayData.boxCenter}>
+              <primitive object={new THREE.LineSegments(debugOverlayData.boxWireframeGeom, new THREE.LineBasicMaterial({ color: '#38bdf8', depthTest: false }))} />
+            </group>
+
+            {/* 3. Dot at arrow's centre (orange/red dot) */}
+            <mesh position={debugOverlayData.arrowCenterVec}>
+              <sphereGeometry args={[0.08, 16, 16]} />
+              <meshBasicMaterial color="#f97316" depthTest={false} />
+            </mesh>
+
+            {/* 4. Line from arrow centre to layer centroid (green line) */}
+            <primitive object={new THREE.Line(debugOverlayData.centerLineGeom, new THREE.LineBasicMaterial({ color: '#22c55e', depthTest: false }))} />
+
+            {/* 5. Arrow Tangent Vector at nearest arc point (bright magenta) */}
+            <primitive object={new THREE.Line(debugOverlayData.tangentLineGeom, new THREE.LineBasicMaterial({ color: '#ec4899', depthTest: false }))} />
+          </group>
         )}
       </group>
     </>

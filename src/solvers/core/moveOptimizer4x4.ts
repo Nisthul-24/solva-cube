@@ -286,25 +286,71 @@ export function optimizeMoves4x4(moves: string[], frame?: VirtualFrame4x4): stri
  */
 export function optimizeMoves4x4Objects(moves: Move[], frame?: VirtualFrame4x4): Move[] {
   if (moves.length === 0) return [];
-  const notations = moves.map((m) => m.notation);
-  const optimizedNotations = optimizeMoves4x4(notations, frame);
 
-  const stageMap = new Map<string, string>();
+  // Group into contiguous segments by stage
+  const segments: Array<{ stage: string; moves: string[] }> = [];
   for (const m of moves) {
-    if (m.stage && !stageMap.has(m.notation)) {
-      stageMap.set(m.notation, m.stage);
+    const stage = m.stage || '4x4 Solve Stage';
+    if (segments.length === 0 || segments[segments.length - 1].stage !== stage) {
+      segments.push({ stage, moves: [m.notation] });
+    } else {
+      segments[segments.length - 1].moves.push(m.notation);
     }
   }
 
-  return optimizedNotations.map((notation) => {
-    const t = turnInfo4x4(notation);
-    return {
-      notation,
-      face: notation[0].toUpperCase(),
-      direction: t.direction,
-      amount: t.direction === 'DOUBLE' ? 2 : t.direction === 'CCW' ? -1 : 1,
-      description: t.wording,
-      stage: stageMap.get(notation) || '4x4 Solve Stage',
-    };
-  });
+  // Optimize each segment
+  const result: Move[] = [];
+  for (const seg of segments) {
+    const optNotations = optimizeMoves4x4(seg.moves, frame);
+    for (const notation of optNotations) {
+      const t = turnInfo4x4(notation);
+      result.push({
+        notation,
+        face: notation[0].toUpperCase(),
+        direction: t.direction,
+        amount: t.direction === 'DOUBLE' ? 2 : t.direction === 'CCW' ? -1 : 1,
+        description: t.wording,
+        stage: seg.stage,
+      });
+    }
+  }
+
+  // Pass over boundaries to cancel/combine adjacent moves on the same axis
+  let changed = true;
+  let iters = 0;
+  while (changed && iters++ < 10) {
+    changed = false;
+    for (let i = 0; i < result.length - 1; i++) {
+      const m1 = result[i];
+      const m2 = result[i + 1];
+      const p1 = parse4x4MoveToLayers(m1.notation);
+      const p2 = parse4x4MoveToLayers(m2.notation);
+      if (p1.axis === p2.axis) {
+        const combined: [number, number, number, number] = [0, 0, 0, 0];
+        for (let l = 0; l < 4; l++) {
+          combined[l] = (p1.layerAmounts[l] + p2.layerAmounts[l]) % 4;
+        }
+        const { moves: optMoves } = optimizeSameAxisRun(p1.axis, combined, frame);
+        if (optMoves.length === 0) {
+          result.splice(i, 2);
+          changed = true;
+          break;
+        } else if (optMoves.length === 1 && optMoves[0] !== m1.notation && optMoves[0] !== m2.notation) {
+          const t = turnInfo4x4(optMoves[0]);
+          result.splice(i, 2, {
+            notation: optMoves[0],
+            face: optMoves[0][0].toUpperCase(),
+            direction: t.direction,
+            amount: t.direction === 'DOUBLE' ? 2 : t.direction === 'CCW' ? -1 : 1,
+            description: t.wording,
+            stage: m2.stage || m1.stage,
+          });
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+
+  return result;
 }

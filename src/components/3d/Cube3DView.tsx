@@ -23,6 +23,7 @@ interface Cube3DViewProps {
   dimension?: 2 | 3 | 4;
   activeFace?: FaceName3x3 | null;
   currentMoveNotation?: string | null;
+  stepPlan?: any;
   isAnimating: boolean;
   isGhostPreview?: boolean;
   turnDurationMs: number;
@@ -45,6 +46,7 @@ export const Cube3DView: React.FC<Cube3DViewProps> = ({
   dimension = 3,
   activeFace,
   currentMoveNotation,
+  stepPlan,
   isAnimating,
   isGhostPreview = false,
   turnDurationMs,
@@ -70,15 +72,17 @@ export const Cube3DView: React.FC<Cube3DViewProps> = ({
   const [movingChip, setMovingChip] = useState<{ text: string; screenX: number; screenY: number; visible: boolean } | null>(null);
   const [devInfo, setDevInfo] = useState<{ targetDir: [number, number, number]; dot: number } | null>(null);
 
+  const effectiveMoveNotation = stepPlan?.emittedMove || currentMoveNotation;
+
   const unified = useMemo(() => {
-    if (!currentMoveNotation || isSolved) return null;
+    if (!effectiveMoveNotation || isSolved) return null;
     try {
       const pType: '3x3' | '2x2' | '4x4' = dimension === 4 ? '4x4' : dimension === 2 ? '2x2' : '3x3';
-      return getPuzzleTurnInfo(pType, currentMoveNotation);
+      return getPuzzleTurnInfo(pType, effectiveMoveNotation);
     } catch (e) {
       return null;
     }
-  }, [dimension, currentMoveNotation, isSolved]);
+  }, [dimension, effectiveMoveNotation, isSolved]);
 
   const cameraPos = useMemo<Vec3>(() => {
     const radius = 4.8;
@@ -90,7 +94,7 @@ export const Cube3DView: React.FC<Cube3DViewProps> = ({
 
   const { handleBestView } = useBestView(
     dimension === 4 ? '4x4' : dimension === 2 ? '2x2' : '3x3',
-    currentMoveNotation,
+    effectiveMoveNotation,
     { azimuth, elevation },
     useCallback((pose: { azimuth: number; elevation: number }) => {
       setAzimuth(pose.azimuth);
@@ -159,12 +163,16 @@ export const Cube3DView: React.FC<Cube3DViewProps> = ({
       {/* 3D Canvas */}
       <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers}>
         <CanvasErrorBoundary onResetCamera={handleResetView}>
-          <ThreeCanvas style={styles.canvas}>
+          <ThreeCanvas
+            style={styles.canvas}
+            camera={dimension === 4 ? { fov: 45 } : undefined}
+          >
             <PuzzleCube3D
               cubeState={cubeState}
               dimension={dimension}
               activeFace={activeFace}
-              currentMoveNotation={currentMoveNotation}
+              currentMoveNotation={effectiveMoveNotation}
+              stepPlan={stepPlan}
               isAnimating={isAnimating}
               isGhostPreview={isGhostPreview}
               turnDurationMs={turnDurationMs}

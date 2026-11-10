@@ -22,11 +22,14 @@ import {
   HelpCircle,
   Settings,
   Dices,
+  Layers,
+  X,
 } from 'lucide-react-native';
 import { Cube3DView } from '../src/components/3d/Cube3DView';
 import { Pyraminx3DView } from '../src/components/3d/Pyraminx3DView';
 import { NetView2x2 } from '../src/components/NetView2x2';
 import { NetViewPyraminx } from '../src/components/NetViewPyraminx';
+import { PuzzleNet } from '../src/components/PuzzleNet';
 import { ConfettiOverlay } from '../src/components/ConfettiOverlay';
 import { usePuzzleStore } from '../src/store/puzzleStore';
 import {
@@ -39,11 +42,12 @@ import { UI_COLORS } from '../src/constants/colors';
 import { adService } from '../src/services/adService';
 import { hapticFeedback } from '../src/services/hapticsService';
 import { getMoveInstructionInfo } from '../src/components/3d/cubieModel';
-import { wording as getEngineWording } from '../src/puzzleEngine/puzzleEngine';
+import { wording as getEngineWording, getStandardMoveNotation } from '../src/puzzleEngine/puzzleEngine';
 import { getPuzzle } from '../src/solvers';
 import { Cube3x3State } from '../src/solvers/cube3x3/cube3x3Facelets';
 import { getFrontMovementHint } from '../src/components/3d/puzzleTurnInfo';
 import { PlaybackController, PlaybackState } from '../src/components/playback/playbackController';
+import { createStepPlan, StepPlan } from '../src/puzzleEngine/stepPlan';
 
 export default function SolutionPlayerScreen() {
   const router = useRouter();
@@ -92,11 +96,29 @@ export default function SolutionPlayerScreen() {
   const [controllerState, setControllerState] = useState<PlaybackState>('idle');
   const controllerRef = useRef<PlaybackController | null>(null);
 
+  // runId token for cancellation safety (Step 2)
+  const runIdRef = useRef<number>(1);
+
+  // Single immutable StepPlan built once from emittedMove via engine (Step 2)
+  const activeStepPlan = useMemo<StepPlan | null>(() => {
+    if (isSolved || currentMoveIndex >= totalMoves) return null;
+    const notation = solutionMoves[currentMoveIndex]?.notation;
+    if (!notation) return null;
+    if (activePuzzleId === '4x4' || activePuzzleId === 'pyraminx') {
+      return createStepPlan(activePuzzleId, currentMoveIndex, notation, runIdRef.current);
+    }
+    return null;
+  }, [activePuzzleId, currentMoveIndex, solutionMoves, isSolved, totalMoves]);
+
   const [isAnimating, setIsAnimating] = useState(false);
   const [animatingMove, setAnimatingMove] = useState<string | null>(null);
+  const [animatingPlan, setAnimatingPlan] = useState<StepPlan | null>(null);
+  const effectiveStepPlan = animatingPlan || activeStepPlan;
+
   const [isCameraMoving, setIsCameraMoving] = useState(false);
   const [isGhostPreview, setIsGhostPreview] = useState(false);
   const [showGuideCard, setShowGuideCard] = useState(false);
+  const [showNetOverview, setShowNetOverview] = useState(false);
   const playTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Speed durations (Requirement 2)
@@ -123,20 +145,40 @@ export default function SolutionPlayerScreen() {
     if (!isNewPlayback) return;
     const controller = new PlaybackController({
       getTotalMoves: () => totalMovesRef.current,
-      getCurrentMoveIndex: () => currentMoveIndexRef.current,
-      getCurrentMoveNotation: () => currentMoveNotationRef.current,
+      getCurrentMoveIndex: () => usePuzzleStore.getState().currentMoveIndex,
+      getCurrentMoveNotation: () => {
+        const st = usePuzzleStore.getState();
+        return st.solutionMoves[st.currentMoveIndex]?.notation || null;
+      },
+      getCurrentStepPlan: () => {
+        const st = usePuzzleStore.getState();
+        if (st.currentMoveIndex >= st.solutionMoves.length) return null;
+        const notation = st.solutionMoves[st.currentMoveIndex]?.notation;
+        if (!notation) return null;
+        if (activePuzzleId === '4x4' || activePuzzleId === 'pyraminx') {
+          return createStepPlan(activePuzzleId, st.currentMoveIndex, notation, runIdRef.current);
+        }
+        return null;
+      },
       getTurnDurationMs: () => turnDurationMsRef.current,
       getArrowWaitDurationMs: () => arrowWaitDurationMsRef.current,
       isAutoViewNeeded: (_move: string) => autoViewModeRef.current !== 'off',
       onStartCameraGlide: (_move: string) => {
         setIsCameraMoving(true);
       },
-      onStartTurnAnimation: (move: string) => {
+      onStartTurnAnimation: (move: string, plan?: any) => {
         setIsAnimating(true);
         setAnimatingMove(move);
+        if (plan) {
+          setAnimatingPlan(plan);
+        }
       },
-      onApplyMove: (_move: string) => {
-        nextMove();
+      onApplyMove: (_move: string, plan?: any) => {
+        if (plan && usePuzzleStore.getState().applyStepPlan) {
+          usePuzzleStore.getState().applyStepPlan!(plan);
+        } else {
+          nextMove();
+        }
       },
       onStepBack: () => {
         prevMove();
@@ -153,7 +195,7 @@ export default function SolutionPlayerScreen() {
       controller.destroy();
       controllerRef.current = null;
     };
-  }, [isNewPlayback, nextMove, prevMove]);
+  }, [isNewPlayback, activePuzzleId, nextMove, prevMove]);
 
   // When move changes, stop ghost preview and handle auto view camera movement
   useEffect(() => {
@@ -201,12 +243,25 @@ export default function SolutionPlayerScreen() {
     if (!currentMoveNotation || isSolved) return null;
     const frontMovementHint = getFrontMovementHint(activePuzzleId, currentMoveNotation);
 
+    if (effectiveStepPlan) {
+      return {
+        move: effectiveStepPlan.chipLabel,
+        boldLayer: effectiveStepPlan.layerName,
+        actionText: '',
+        hint: frontMovementHint || 'Follow the 3D direction arrow.',
+        centerColor: '',
+        centerColorHex: 'transparent',
+        fullAction: effectiveStepPlan.wordingText,
+        isPyraminx: activePuzzleId === 'pyraminx',
+      };
+    }
+
     if (activePuzzleId === '4x4') {
       const curMoveObj = solutionMoves[currentMoveIndex];
       const info = getEngineWording('4x4', currentMoveNotation);
-      const moveDesc = curMoveObj?.description || info.fullInstruction;
+      const moveDesc = info.fullInstruction || curMoveObj?.description || currentMoveNotation;
       return {
-        move: currentMoveNotation,
+        move: getStandardMoveNotation(activePuzzleId, currentMoveNotation),
         boldLayer: info.layerName,
         actionText: '',
         hint: frontMovementHint || 'Follow the 3D direction arrow.',
@@ -219,9 +274,9 @@ export default function SolutionPlayerScreen() {
     if (activePuzzleId === 'pyraminx') {
       const curMoveObj = solutionMoves[currentMoveIndex];
       const info = getEngineWording('pyraminx', currentMoveNotation);
-      const moveDesc = curMoveObj?.description || info.fullInstruction;
+      const moveDesc = info.fullInstruction || curMoveObj?.description || currentMoveNotation;
       return {
-        move: currentMoveNotation,
+        move: getStandardMoveNotation(activePuzzleId, currentMoveNotation),
         boldLayer: info.layerName,
         actionText: '',
         hint: frontMovementHint || 'Follow the 3D direction arrow.',
@@ -236,9 +291,16 @@ export default function SolutionPlayerScreen() {
       ...baseInfo,
       hint: frontMovementHint || baseInfo.hint,
     };
-  }, [currentMoveNotation, isSolved, activePuzzleId, solutionMoves, currentMoveIndex]);
+  }, [currentMoveNotation, isSolved, activePuzzleId, solutionMoves, currentMoveIndex, effectiveStepPlan]);
 
   const handleScrambleAndReplay4x4 = useCallback(() => {
+    runIdRef.current++;
+    setIsAnimating(false);
+    setAnimatingMove(null);
+    setAnimatingPlan(null);
+    if (isNewPlayback) {
+      controllerRef.current?.pause();
+    }
     hapticFeedback.medium();
     const puzzle = getPuzzle('4x4');
     const { moves } = puzzle.scramble(40);
@@ -248,12 +310,13 @@ export default function SolutionPlayerScreen() {
       currentState: puzzle.getSolvedState(),
       isPlaying: false,
     });
-  }, []);
+  }, [isNewPlayback]);
 
   // Handle animation completion
   const handleAnimationComplete = useCallback(() => {
     setIsAnimating(false);
     setAnimatingMove(null);
+    setAnimatingPlan(null);
 
     if (isNewPlayback) {
       controllerRef.current?.notifyTurnComplete();
@@ -303,6 +366,10 @@ export default function SolutionPlayerScreen() {
     hapticFeedback.light();
     if (isNewPlayback) {
       if (isEffectivePlaying) {
+        runIdRef.current++;
+        setIsAnimating(false);
+        setAnimatingMove(null);
+        setAnimatingPlan(null);
         controllerRef.current?.pause();
       } else {
         if (isGhostPreview) setIsGhostPreview(false);
@@ -337,6 +404,10 @@ export default function SolutionPlayerScreen() {
     setIsGhostPreview(false);
     hapticFeedback.medium();
     if (isNewPlayback) {
+      runIdRef.current++;
+      setIsAnimating(false);
+      setAnimatingMove(null);
+      setAnimatingPlan(null);
       controllerRef.current?.next();
     } else {
       if (isAnimating || isCameraMoving) return;
@@ -352,6 +423,10 @@ export default function SolutionPlayerScreen() {
     setIsGhostPreview(false);
     hapticFeedback.light();
     if (isNewPlayback) {
+      runIdRef.current++;
+      setIsAnimating(false);
+      setAnimatingMove(null);
+      setAnimatingPlan(null);
       controllerRef.current?.prev();
     } else {
       if (isAnimating) return;
@@ -360,10 +435,12 @@ export default function SolutionPlayerScreen() {
   };
 
   const handleStartOver = () => {
+    runIdRef.current++;
     setIsGhostPreview(false);
     hapticFeedback.medium();
     setIsAnimating(false);
     setAnimatingMove(null);
+    setAnimatingPlan(null);
     if (isNewPlayback) {
       controllerRef.current?.destroy();
     }
@@ -407,6 +484,16 @@ export default function SolutionPlayerScreen() {
         <View style={styles.headerRightActions}>
           <TouchableOpacity
             style={styles.howToButton}
+            onPress={() => setShowNetOverview((prev) => !prev)}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle 2D Net Overview"
+          >
+            <Layers size={18} color="#22d3ee" />
+            <Text style={styles.howToText}>Net</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.howToButton}
             onPress={() => setShowGuideCard((prev) => !prev)}
           >
             <HelpCircle size={18} color="#22d3ee" />
@@ -423,6 +510,35 @@ export default function SolutionPlayerScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* 2D Net Overview Collapsible Card */}
+      {showNetOverview && (
+        <View style={styles.netOverviewContainer}>
+          <View style={styles.netOverviewHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Layers size={16} color="#22d3ee" />
+              <Text style={styles.netOverviewTitle}>2D Net Overview (Turning Layer Outlined)</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setShowNetOverview(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Close Net Overview"
+              style={{ padding: 4 }}
+            >
+              <X size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.netOverviewBody}>
+            <PuzzleNet
+              puzzleId={activePuzzleId}
+              state={currentState as any}
+              highlightMove={effectiveStepPlan?.emittedMove || animatingMove || currentMoveNotation}
+              stepPlan={effectiveStepPlan}
+              readOnly
+            />
+          </View>
+        </View>
+      )}
 
       {/* "How to follow along" Collapsible Card */}
       {showGuideCard && (
@@ -453,7 +569,8 @@ export default function SolutionPlayerScreen() {
             <Cube3DView
               cubeState={currentState as any}
               dimension={activePuzzleId === '4x4' ? 4 : activePuzzleId === '2x2' ? 2 : 3}
-              currentMoveNotation={animatingMove || currentMoveNotation}
+              currentMoveNotation={effectiveStepPlan?.emittedMove || animatingMove || currentMoveNotation}
+              stepPlan={effectiveStepPlan}
               isAnimating={isAnimating}
               isGhostPreview={isGhostPreview}
               turnDurationMs={turnDurationMs}
@@ -543,7 +660,7 @@ export default function SolutionPlayerScreen() {
                         isPast && styles.moveChipTextPast,
                       ]}
                     >
-                      {m.notation}
+                      {getStandardMoveNotation(activePuzzleId, m.notation)}
                     </Text>
                   </View>
                 );
@@ -830,6 +947,33 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(34, 211, 238, 0.25)',
+  },
+  netOverviewContainer: {
+    backgroundColor: '#0F172A',
+    padding: 12,
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 211, 238, 0.3)',
+  },
+  netOverviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  netOverviewTitle: {
+    color: '#22d3ee',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  netOverviewBody: {
+    width: '100%',
+    maxHeight: 280,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
   },
   howToCardTitle: {
     color: '#22d3ee',

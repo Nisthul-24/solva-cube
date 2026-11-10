@@ -1,3 +1,25 @@
+class Vector2 {
+  constructor(x = 0, y = 0) {
+    this.x = x; this.y = y;
+  }
+  set(x, y) { this.x = x; this.y = y; return this; }
+  clone() { return new Vector2(this.x, this.y); }
+  copy(v) { this.x = v.x; this.y = v.y; return this; }
+  add(v) { this.x += v.x; this.y += v.y; return this; }
+  sub(v) { this.x -= v.x; this.y -= v.y; return this; }
+  multiplyScalar(s) { this.x *= s; this.y *= s; return this; }
+  divideScalar(s) { this.x /= s; this.y /= s; return this; }
+  dot(v) { return this.x * v.x + this.y * v.y; }
+  lengthSq() { return this.x * this.x + this.y * this.y; }
+  length() { return Math.hypot(this.x, this.y); }
+  distanceTo(v) { return Math.hypot(this.x - v.x, this.y - v.y); }
+  normalize() {
+    const l = Math.hypot(this.x, this.y);
+    if (l > 0) { this.x /= l; this.y /= l; }
+    return this;
+  }
+}
+
 class Vector3 {
   constructor(x = 0, y = 0, z = 0) {
     this.x = x; this.y = y; this.z = z;
@@ -324,6 +346,7 @@ class PerspectiveCamera {
 }
 
 module.exports = {
+  Vector2,
   Vector3,
   Quaternion,
   PerspectiveCamera,

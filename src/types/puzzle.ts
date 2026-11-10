@@ -1,5 +1,12 @@
 export type PuzzleId = '3x3' | '2x2' | '4x4' | 'pyraminx';
 
+/**
+ * EmittedMove: A validated move strictly in the puzzle's fixed global reference frame,
+ * emitted by the engine / solver after any internal frame mapping is completed.
+ * Only EmittedMove strings may be consumed by UI and 3D render components.
+ */
+export type EmittedMove = string & { readonly __emittedBrand?: unique symbol };
+
 export type CubeColor = 'white' | 'yellow' | 'green' | 'blue' | 'red' | 'orange';
 export type PyraminxColor = 'red' | 'green' | 'blue' | 'yellow';
 export type PuzzleColor = CubeColor | PyraminxColor;

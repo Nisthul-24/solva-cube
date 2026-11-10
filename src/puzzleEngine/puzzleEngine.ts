@@ -44,14 +44,20 @@ export interface EnginePiece {
 export interface EngineMove {
   name: string;
   axis: Vec3; // GLOBAL fixed vector: +x/+y/+z for cube, vertex unit vector for Pyraminx
+  outwardNormal?: Vec3; // Unit outward normal toward viewer's side (+1 for U/R/F, -1 for D/L/B)
+  layers?: number[]; // Layer indices along axis (0..3 for 4x4)
   axisName?: 'x' | 'y' | 'z';
   selector: (centroid: Vec3) => boolean;
   angle: number; // signed radians
   isDouble: boolean;
   isCCW: boolean;
+  isSlice?: boolean;
+  isWide?: boolean;
   permutation: number[]; // derived from 3D geometry rotation of sticker centroids
+  turningPieces?: EnginePiece[];
   turningPieceIds: string[]; // cached array of piece ids that turn
   turningPieceSet: Set<string>;
+  layerDesc?: string;
   wording: string; // layer description: "the two bottom layers", "the second layer from the bottom", etc.
   layerName: string; // pulsing chip text: "Bottom two layers", "Inner right slice", etc.
   fullInstruction: string; // e.g. "Turn the two bottom layers 180°"
@@ -136,62 +142,102 @@ function build4x4Pieces(): EnginePiece[] {
   return pieces;
 }
 
-function build4x4Wording(axisName: 'x' | 'y' | 'z', layers: number[], isDouble: boolean, isPrime: boolean): {
+// -----------------------------------------------------------------------
+// 4X4 REVENGE CUBE MOVE VOCABULARY & ENGINE
+// -----------------------------------------------------------------------
+
+export interface MoveVocab4x4 {
+  canonical: string;       // Standard name: 'R', 'Rw', '2R'
+  face: FaceName3x3;
+  layers: number[];        // Layer indices along positive axis [0..3]
+  isWide: boolean;
+  isInner: boolean;
+  axis: Vec3;              // Unit vector along positive coordinate axis
+  outwardNormal: Vec3;     // Outward normal of the face
+  axisName: 'x' | 'y' | 'z';
+  baseAngle: number;       // Base angle for clockwise turn about outwardNormal
+  chipLabel: string;
+  sideName: string;
+}
+
+// Fixed 4x4 move vocabulary table (Part B item 1)
+export const MOVE_VOCAB_4X4: Record<string, MoveVocab4x4> = {
+  // RIGHT (+x)
+  'R':  { canonical: 'R',  face: 'R', layers: [3],    isWide: false, isInner: false, axis: [1, 0, 0], outwardNormal: [1, 0, 0],  axisName: 'x', baseAngle: -Math.PI / 2, chipLabel: 'R',  sideName: 'right' },
+  'Rw': { canonical: 'Rw', face: 'R', layers: [2, 3], isWide: true,  isInner: false, axis: [1, 0, 0], outwardNormal: [1, 0, 0],  axisName: 'x', baseAngle: -Math.PI / 2, chipLabel: 'Rw', sideName: 'right' },
+  '2R': { canonical: '2R', face: 'R', layers: [2],    isWide: false, isInner: true,  axis: [1, 0, 0], outwardNormal: [1, 0, 0],  axisName: 'x', baseAngle: -Math.PI / 2, chipLabel: '2R', sideName: 'right' },
+  'r':  { canonical: '2R', face: 'R', layers: [2],    isWide: false, isInner: true,  axis: [1, 0, 0], outwardNormal: [1, 0, 0],  axisName: 'x', baseAngle: -Math.PI / 2, chipLabel: '2R', sideName: 'right' },
+
+  // LEFT (-x)
+  'L':  { canonical: 'L',  face: 'L', layers: [0],    isWide: false, isInner: false, axis: [1, 0, 0], outwardNormal: [-1, 0, 0], axisName: 'x', baseAngle: Math.PI / 2,  chipLabel: 'L',  sideName: 'left' },
+  'Lw': { canonical: 'Lw', face: 'L', layers: [0, 1], isWide: true,  isInner: false, axis: [1, 0, 0], outwardNormal: [-1, 0, 0], axisName: 'x', baseAngle: Math.PI / 2,  chipLabel: 'Lw', sideName: 'left' },
+  '2L': { canonical: '2L', face: 'L', layers: [1],    isWide: false, isInner: true,  axis: [1, 0, 0], outwardNormal: [-1, 0, 0], axisName: 'x', baseAngle: Math.PI / 2,  chipLabel: '2L', sideName: 'left' },
+  'l':  { canonical: '2L', face: 'L', layers: [1],    isWide: false, isInner: true,  axis: [1, 0, 0], outwardNormal: [-1, 0, 0], axisName: 'x', baseAngle: Math.PI / 2,  chipLabel: '2L', sideName: 'left' },
+
+  // TOP / UP (+y)
+  'U':  { canonical: 'U',  face: 'U', layers: [3],    isWide: false, isInner: false, axis: [0, 1, 0], outwardNormal: [0, 1, 0],  axisName: 'y', baseAngle: -Math.PI / 2, chipLabel: 'U',  sideName: 'top' },
+  'Uw': { canonical: 'Uw', face: 'U', layers: [2, 3], isWide: true,  isInner: false, axis: [0, 1, 0], outwardNormal: [0, 1, 0],  axisName: 'y', baseAngle: -Math.PI / 2, chipLabel: 'Uw', sideName: 'top' },
+  '2U': { canonical: '2U', face: 'U', layers: [2],    isWide: false, isInner: true,  axis: [0, 1, 0], outwardNormal: [0, 1, 0],  axisName: 'y', baseAngle: -Math.PI / 2, chipLabel: '2U', sideName: 'top' },
+  'u':  { canonical: '2U', face: 'U', layers: [2],    isWide: false, isInner: true,  axis: [0, 1, 0], outwardNormal: [0, 1, 0],  axisName: 'y', baseAngle: -Math.PI / 2, chipLabel: '2U', sideName: 'top' },
+
+  // BOTTOM / DOWN (-y)
+  'D':  { canonical: 'D',  face: 'D', layers: [0],    isWide: false, isInner: false, axis: [0, 1, 0], outwardNormal: [0, -1, 0], axisName: 'y', baseAngle: Math.PI / 2,  chipLabel: 'D',  sideName: 'bottom' },
+  'Dw': { canonical: 'Dw', face: 'D', layers: [0, 1], isWide: true,  isInner: false, axis: [0, 1, 0], outwardNormal: [0, -1, 0], axisName: 'y', baseAngle: Math.PI / 2,  chipLabel: 'Dw', sideName: 'bottom' },
+  '2D': { canonical: '2D', face: 'D', layers: [1],    isWide: false, isInner: true,  axis: [0, 1, 0], outwardNormal: [0, -1, 0], axisName: 'y', baseAngle: Math.PI / 2,  chipLabel: '2D', sideName: 'bottom' },
+  'd':  { canonical: '2D', face: 'D', layers: [1],    isWide: false, isInner: true,  axis: [0, 1, 0], outwardNormal: [0, -1, 0], axisName: 'y', baseAngle: Math.PI / 2,  chipLabel: '2D', sideName: 'bottom' },
+
+  // FRONT (+z)
+  'F':  { canonical: 'F',  face: 'F', layers: [3],    isWide: false, isInner: false, axis: [0, 0, 1], outwardNormal: [0, 0, 1],  axisName: 'z', baseAngle: -Math.PI / 2, chipLabel: 'F',  sideName: 'front' },
+  'Fw': { canonical: 'Fw', face: 'F', layers: [2, 3], isWide: true,  isInner: false, axis: [0, 0, 1], outwardNormal: [0, 0, 1],  axisName: 'z', baseAngle: -Math.PI / 2, chipLabel: 'Fw', sideName: 'front' },
+  '2F': { canonical: '2F', face: 'F', layers: [2],    isWide: false, isInner: true,  axis: [0, 0, 1], outwardNormal: [0, 0, 1],  axisName: 'z', baseAngle: -Math.PI / 2, chipLabel: '2F', sideName: 'front' },
+  'f':  { canonical: '2F', face: 'F', layers: [2],    isWide: false, isInner: true,  axis: [0, 0, 1], outwardNormal: [0, 0, 1],  axisName: 'z', baseAngle: -Math.PI / 2, chipLabel: '2F', sideName: 'front' },
+
+  // BACK (-z)
+  'B':  { canonical: 'B',  face: 'B', layers: [0],    isWide: false, isInner: false, axis: [0, 0, 1], outwardNormal: [0, 0, -1], axisName: 'z', baseAngle: Math.PI / 2,  chipLabel: 'B',  sideName: 'back' },
+  'Bw': { canonical: 'Bw', face: 'B', layers: [0, 1], isWide: true,  isInner: false, axis: [0, 0, 1], outwardNormal: [0, 0, -1], axisName: 'z', baseAngle: Math.PI / 2,  chipLabel: 'Bw', sideName: 'back' },
+  '2B': { canonical: '2B', face: 'B', layers: [1],    isWide: false, isInner: true,  axis: [0, 0, 1], outwardNormal: [0, 0, -1], axisName: 'z', baseAngle: Math.PI / 2,  chipLabel: '2B', sideName: 'back' },
+  'b':  { canonical: '2B', face: 'B', layers: [1],    isWide: false, isInner: true,  axis: [0, 0, 1], outwardNormal: [0, 0, -1], axisName: 'z', baseAngle: Math.PI / 2,  chipLabel: '2B', sideName: 'back' },
+};
+
+function build4x4WordingFromVocab(
+  vocab: MoveVocab4x4,
+  isDouble: boolean,
+  isPrime: boolean
+): {
   layerDesc: string;
   layerName: string;
   fullInstruction: string;
   directionWord: string;
 } {
-  const minSide = axisName === 'x' ? 'left' : axisName === 'y' ? 'bottom' : 'back';
-  const maxSide = axisName === 'x' ? 'right' : axisName === 'y' ? 'top' : 'front';
-  const capMin = minSide.charAt(0).toUpperCase() + minSide.slice(1);
-  const capMax = maxSide.charAt(0).toUpperCase() + maxSide.slice(1);
+  const { sideName, isWide, isInner, axisName } = vocab;
+  const capSide = sideName.charAt(0).toUpperCase() + sideName.slice(1);
 
   let layerDesc = '';
   let layerName = '';
 
-  const sortedLayers = [...layers].sort();
-  const isWide = sortedLayers.length === 2;
-  const isInner = sortedLayers.length === 1 && (sortedLayers[0] === 1 || sortedLayers[0] === 2);
-
   if (isWide) {
-    if (sortedLayers[0] === 0 && sortedLayers[1] === 1) {
-      layerDesc = `the two ${minSide} layers`;
-      layerName = `${capMin} two layers`;
-    } else {
-      layerDesc = `the two ${maxSide} layers`;
-      layerName = `${capMax} two layers`;
-    }
+    layerDesc = `the two ${sideName} layers`;
+    layerName = `${capSide} two layers`;
   } else if (isInner) {
-    if (sortedLayers[0] === 1) {
-      layerDesc = `the second layer from the ${minSide}`;
-      layerName = `Inner ${minSide} slice`;
-    } else {
-      layerDesc = `the second layer from the ${maxSide}`;
-      layerName = `Inner ${maxSide} slice`;
-    }
+    layerDesc = `the inner layer second from the ${sideName}`;
+    layerName = `Inner ${sideName} slice`;
   } else {
-    if (sortedLayers[0] === 0) {
-      layerDesc = `the ${minSide} layer`;
-      layerName = `${capMin} layer`;
-    } else {
-      layerDesc = `the ${maxSide} layer`;
-      layerName = `${capMax} layer`;
-    }
+    layerDesc = `the outer ${sideName} layer`;
+    layerName = `Outer ${sideName} layer`;
   }
 
   // Direction word for front-perspective action
   let cwAction = '';
   let ccwAction = '';
   if (axisName === 'y') {
-    cwAction = sortedLayers.includes(3) || sortedLayers.includes(2) ? 'LEFT' : 'RIGHT';
-    ccwAction = sortedLayers.includes(3) || sortedLayers.includes(2) ? 'RIGHT' : 'LEFT';
+    cwAction = vocab.layers.includes(3) || vocab.layers.includes(2) ? 'LEFT' : 'RIGHT';
+    ccwAction = vocab.layers.includes(3) || vocab.layers.includes(2) ? 'RIGHT' : 'LEFT';
   } else if (axisName === 'x') {
-    cwAction = sortedLayers.includes(3) || sortedLayers.includes(2) ? 'UP' : 'DOWN';
-    ccwAction = sortedLayers.includes(3) || sortedLayers.includes(2) ? 'DOWN' : 'UP';
+    cwAction = vocab.layers.includes(3) || vocab.layers.includes(2) ? 'UP' : 'DOWN';
+    ccwAction = vocab.layers.includes(3) || vocab.layers.includes(2) ? 'DOWN' : 'UP';
   } else {
-    cwAction = sortedLayers.includes(3) || sortedLayers.includes(2) ? 'CLOCKWISE' : 'COUNTER-CLOCKWISE';
-    ccwAction = sortedLayers.includes(3) || sortedLayers.includes(2) ? 'COUNTER-CLOCKWISE' : 'CLOCKWISE';
+    cwAction = vocab.layers.includes(3) || vocab.layers.includes(2) ? 'CLOCKWISE' : 'COUNTER-CLOCKWISE';
+    ccwAction = vocab.layers.includes(3) || vocab.layers.includes(2) ? 'COUNTER-CLOCKWISE' : 'CLOCKWISE';
   }
 
   const directionWord = isDouble ? '180°' : isPrime ? ccwAction : cwAction;
@@ -204,62 +250,17 @@ function build4x4Wording(axisName: 'x' | 'y' | 'z', layers: number[], isDouble: 
 
 function build4x4Moves(pieces: EnginePiece[]): Map<string, EngineMove> {
   const moves = new Map<string, EngineMove>();
-  const baseMoves = ['U', 'D', 'L', 'R', 'F', 'B', 'Uw', 'Dw', 'Lw', 'Rw', 'Fw', 'Bw', 'u', 'd', 'l', 'r', 'f', 'b'];
   const stickerLayout = STICKER_LAYOUT_4X4;
+  const baseKeys = Object.keys(MOVE_VOCAB_4X4);
 
-  for (const base of baseMoves) {
-    const isWide = base.includes('w');
-    const isInner = base === base.toLowerCase() && !isWide;
-    const faceUpper = base[0].toUpperCase() as FaceName3x3;
-
-    let axis: Vec3 = [0, 1, 0];
-    let axisName: 'x' | 'y' | 'z' = 'y';
-    let baseAngle = -Math.PI / 2;
-    let layers: number[] = [3];
-
-    switch (faceUpper) {
-      case 'R':
-        axis = [1, 0, 0];
-        axisName = 'x';
-        baseAngle = -Math.PI / 2;
-        layers = isWide ? [2, 3] : isInner ? [2] : [3];
-        break;
-      case 'L':
-        axis = [1, 0, 0];
-        axisName = 'x';
-        baseAngle = Math.PI / 2;
-        layers = isWide ? [0, 1] : isInner ? [1] : [0];
-        break;
-      case 'U':
-        axis = [0, 1, 0];
-        axisName = 'y';
-        baseAngle = -Math.PI / 2;
-        layers = isWide ? [2, 3] : isInner ? [2] : [3];
-        break;
-      case 'D':
-        axis = [0, 1, 0];
-        axisName = 'y';
-        baseAngle = Math.PI / 2;
-        layers = isWide ? [0, 1] : isInner ? [1] : [0];
-        break;
-      case 'F':
-        axis = [0, 0, 1];
-        axisName = 'z';
-        baseAngle = -Math.PI / 2;
-        layers = isWide ? [2, 3] : isInner ? [2] : [3];
-        break;
-      case 'B':
-        axis = [0, 0, 1];
-        axisName = 'z';
-        baseAngle = Math.PI / 2;
-        layers = isWide ? [0, 1] : isInner ? [1] : [0];
-        break;
-    }
-
+  for (const baseKey of baseKeys) {
+    const vocab = MOVE_VOCAB_4X4[baseKey];
+    const { axis, outwardNormal, axisName, layers, baseAngle } = vocab;
     const axisIdx = axisName === 'x' ? 0 : axisName === 'y' ? 1 : 2;
 
     for (const suffix of ['', "'", '2']) {
-      const name = `${base}${suffix}`;
+      const name = `${baseKey}${suffix}`;
+      const canonicalName = `${vocab.canonical}${suffix}`;
       const isDouble = suffix === '2';
       const isPrime = suffix === "'";
       const angle = isDouble ? baseAngle * 2 : isPrime ? -baseAngle : baseAngle;
@@ -274,7 +275,7 @@ function build4x4Moves(pieces: EnginePiece[]): Map<string, EngineMove> {
       const turningPieceIds = turningPieces.map((p) => p.id);
       const turningPieceSet = new Set(turningPieceIds);
 
-      // Centroid and extent of turning pieces
+      // Centroid of turning pieces
       const sumCentroid: Vec3 = [0, 0, 0];
       let minCoord = Infinity;
       let maxCoord = -Infinity;
@@ -292,25 +293,46 @@ function build4x4Moves(pieces: EnginePiece[]): Map<string, EngineMove> {
         sumCentroid[1] / count,
         sumCentroid[2] / count,
       ];
-      // Extent along axis: distance from min to max cubie centers + 1.0 (cubie size)
       const layerExtent = maxCoord - minCoord + 1.0;
 
-      // Arrow center: on axis at the mean coordinate of the layers
-      // Layer coords are -1.5, -0.5, 0.5, 1.5
-      const layerCoords = [-1.5, -0.5, 0.5, 1.5];
-      const meanAxisCoord = layers.reduce((acc, l) => acc + layerCoords[l], 0) / layers.length;
-      const arrowCenter = scale(axis, meanAxisCoord);
+      // Arrow center: centroid of turning cubies projected onto the axis
+      // Dot product with unit axis gives exact coordinate along axis
+      const axisCoord = dot(layerCentroid, axis);
+      const arrowCenter = scale(axis, axisCoord);
 
-      // Arrow radius: 1.18 x half-diagonal of cross section (2.0 * sqrt(2))
-      const halfDiag = 2.0 * Math.SQRT2;
-      const arrowRadius = 1.18 * halfDiag;
+      // Arrow orbit radius: 1.15 x largest distance from rotation axis A to any moving piece's vertex
+      let maxDistToAxis = 0;
+      for (const p of turningPieces) {
+        const [cx, cy, cz] = p.homeCentroid;
+        for (const dx of [-0.5, 0.5]) {
+          for (const dy of [-0.5, 0.5]) {
+            for (const dz of [-0.5, 0.5]) {
+              const v: Vec3 = [cx + dx, cy + dy, cz + dz];
+              const vDotA = dot(v, axis);
+              const vPerp = sub(v, scale(axis, vDotA));
+              const d = norm(vPerp);
+              if (d > maxDistToAxis) maxDistToAxis = d;
+            }
+          }
+        }
+      }
+      const arrowRadius = 1.15 * maxDistToAxis;
 
-      // Orthonormal basis for arrow
-      const { U, V } = getOrthonormalBasis(axis);
+      // Orthonormal basis for arrow using the exact animation axis
+      // Orient U towards canonical camera direction [1, 0.8, 1] so arrow faces user
+      const camDir: Vec3 = [1, 0.8, 1];
+      const camRel = sub(camDir, arrowCenter);
+      const camDotA = dot(camRel, axis);
+      let camPerp = sub(camRel, scale(axis, camDotA));
+      if (norm(camPerp) < 1e-4) {
+        camPerp = Math.abs(axis[1]) < 0.88 ? [0, 1, 0] : [1, 0, 0];
+      }
+      const U = normalize(camPerp);
+      const V = cross(axis, U);
       const ribbonWidth = 0.22;
-      const headLength = 0.70;
-      const headWidth = 0.44;
-      const sweepSpan = isDouble ? (220 * Math.PI) / 180 : (110 * Math.PI) / 180;
+      const headLength = 0.65;
+      const headWidth = 0.42;
+      const sweepSpan = (90 * Math.PI) / 180; // 90-degree arc for cube
 
       const arrow = buildOrbitArrow(
         arrowCenter,
@@ -325,7 +347,7 @@ function build4x4Moves(pieces: EnginePiece[]): Map<string, EngineMove> {
         sweepSpan
       );
 
-      // Permutation table: derived strictly by rotating sticker centroids in 3D
+      // Permutation table strictly from 3D geometry rotation
       const permutation: number[] = new Array(96);
       for (let i = 0; i < 96; i++) {
         const st = stickerLayout[i];
@@ -357,34 +379,44 @@ function build4x4Moves(pieces: EnginePiece[]): Map<string, EngineMove> {
         }
       }
 
-      const { layerDesc, layerName, fullInstruction, directionWord } = build4x4Wording(
-        axisName,
-        layers,
+      const { layerDesc, layerName, fullInstruction, directionWord } = build4x4WordingFromVocab(
+        vocab,
         isDouble,
         isPrime
       );
 
-      moves.set(name, {
+      const moveObj: EngineMove = {
         name,
         axis,
+        outwardNormal,
         axisName,
-        selector,
         angle,
+        layers,
         isDouble,
-        isCCW: isPrime,
-        permutation,
+        isSlice: vocab.isInner,
+        isWide: vocab.isWide,
+        selector,
+        turningPieces,
         turningPieceIds,
         turningPieceSet,
-        wording: layerDesc,
-        layerName,
-        fullInstruction,
-        directionWord,
         layerCentroid,
         layerExtent,
         arrowCenter,
         arrowRadius,
         arrow,
-      });
+        permutation,
+        layerDesc,
+        layerName,
+        wording: fullInstruction,
+        fullInstruction,
+        directionWord,
+        isCCW: isPrime,
+      };
+
+      moves.set(name, moveObj);
+      if (canonicalName !== name && !moves.has(canonicalName)) {
+        moves.set(canonicalName, moveObj);
+      }
     }
   }
 
@@ -476,20 +508,31 @@ function buildPyraminxMoves(pieces: EnginePiece[]): Map<string, EngineMove> {
         ];
         const layerExtent = (1 - threshold) * ((4 * R_dist) / 3);
 
-        // Plane at t_cut + 0.12
-        const tCut = threshold;
-        const tPlane = tCut + 0.12;
-        const dPlane = -R_dist / 3 + tPlane * ((4 * R_dist) / 3);
-        const arrowCenter = scale(axis, dPlane);
+        // Arrow center: centered on the cap's centroid projected onto vertex axis (Part C item 2)
+        const arrowCenter = scale(axis, dot(layerCentroid, axis));
 
-        // Arrow radius: 1.25 x rho(t_cut), rho(t) = sqrt(8/3) * (1 - t)
-        const rhoCut = Math.sqrt(8 / 3) * (1 - tCut);
-        const arrowRadius = 1.25 * rhoCut;
+        // Arrow radius: 1.15 x largest distance from rotation axis A to any moving piece's vertex
+        let maxDistToAxis = 0;
+        for (const p of turningPieces) {
+          const pDef = PYRAMINX_PIECES_14.find((def) => def.id === p.id);
+          if (pDef) {
+            const pos = pDef.bodyPositions;
+            for (let vi = 0; vi < pos.length; vi += 3) {
+              const v: Vec3 = [pos[vi], pos[vi + 1], pos[vi + 2]];
+              const vDotA = dot(v, axis);
+              const vPerp = sub(v, scale(axis, vDotA));
+              const d = norm(vPerp);
+              if (d > maxDistToAxis) maxDistToAxis = d;
+            }
+          }
+        }
+        const arrowRadius = 1.15 * maxDistToAxis;
 
         const { U, V } = getOrthonormalBasis(axis);
-        const ribbonWidth = isTip ? 0.08 : 0.11;
-        const headLength = isTip ? 0.26 : 0.35;
-        const headWidth = isTip ? 0.16 : 0.22;
+        // Width: 5% of model size (model edge length = sqrt(8) approx 2.828)
+        const ribbonWidth = 0.05 * Math.sqrt(8); // approx 0.141
+        const headLength = 0.36;
+        const headWidth = 0.28;
         const sweepSpan = (120 * Math.PI) / 180;
 
         const arrow = buildOrbitArrow(
@@ -634,4 +677,15 @@ export function wording(
   move: string
 ): { layerDesc: string; layerName: string; fullInstruction: string } {
   return getPuzzleEngine(puzzleId).wording(move);
+}
+
+export function getStandardMoveNotation(puzzleId: string, notation: string): string {
+  if (puzzleId !== '4x4') return notation;
+  const suf = notation.endsWith('2') ? '2' : notation.endsWith("'") ? "'" : '';
+  const base = notation.replace(/['2]/g, '');
+  const vocab = MOVE_VOCAB_4X4[base];
+  if (vocab) {
+    return `${vocab.canonical}${suf}`;
+  }
+  return notation;
 }

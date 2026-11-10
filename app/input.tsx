@@ -32,6 +32,7 @@ import { Pyraminx3DView } from '../src/components/3d/Pyraminx3DView';
 import { NetView3x3 } from '../src/components/NetView3x3';
 import { NetView2x2 } from '../src/components/NetView2x2';
 import { NetViewPyraminx } from '../src/components/NetViewPyraminx';
+import { PuzzleNet } from '../src/components/PuzzleNet';
 import { BannerAdComponent } from '../src/components/BannerAdComponent';
 import { adService } from '../src/services/adService';
 import { usePuzzleStore } from '../src/store/puzzleStore';
@@ -489,15 +490,17 @@ export default function ColourInputScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={{ alignItems: 'center', paddingVertical: 12 }}>
-              {activePuzzleId === '3x3' ? (
-                <NetView3x3 state={currentState as any} />
-              ) : activePuzzleId === '2x2' ? (
-                <NetView2x2 state={currentState as any} readOnly />
-              ) : (
-                <NetViewPyraminx state={currentState as any} readOnly />
-              )}
-            </ScrollView>
+            <View style={styles.netSvgBox}>
+              <PuzzleNet
+                puzzleId={activePuzzleId}
+                state={currentState as any}
+                onStickerPress={(face, idx) => {
+                  hapticFeedback.light();
+                  paintSticker(face, idx, false);
+                }}
+                readOnly={false}
+              />
+            </View>
 
             <TouchableOpacity
               style={styles.modalDoneBtn}
@@ -798,12 +801,19 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 520,
+    maxHeight: '94%',
     backgroundColor: '#0F172A',
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(34, 211, 238, 0.4)',
     padding: 16,
+  },
+  netSvgBox: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
   },
   modalHeader: {
     flexDirection: 'row',

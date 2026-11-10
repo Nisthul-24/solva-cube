@@ -40,6 +40,11 @@ describe('4x4 Full Solver Test Suite (300 Scrambles)', () => {
     }
 
     const dt = Date.now() - t0;
-    console.log(`4x4 Full Solve (${N} Scrambles) Benchmark: Total time = ${dt}ms (avg ${(dt / N).toFixed(1)}ms/solve), Avg moves = ${(totalMoves / N).toFixed(1)}, Max moves = ${maxMoves}`);
+    const avgMoves = totalMoves / N;
+    console.log(`4x4 Full Solve (${N} Scrambles) Benchmark: Total time = ${dt}ms (avg ${(dt / N).toFixed(1)}ms/solve), Avg moves = ${avgMoves.toFixed(1)}, Max moves = ${maxMoves}`);
+
+    // Regression test: fails if average or maximum is worse than baseline
+    expect(avgMoves).toBeLessThanOrEqual(110.0);
+    expect(maxMoves).toBeLessThanOrEqual(150);
   }, 180000);
 });

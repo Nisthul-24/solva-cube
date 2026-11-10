@@ -4,12 +4,13 @@ export interface PlaybackControllerOptions {
   getTotalMoves: () => number;
   getCurrentMoveIndex: () => number;
   getCurrentMoveNotation: () => string | null;
+  getCurrentStepPlan?: () => any;
   getTurnDurationMs: () => number;
   getArrowWaitDurationMs: () => number;
   isAutoViewNeeded: (move: string) => boolean;
   onStartCameraGlide: (move: string) => void;
-  onStartTurnAnimation: (move: string) => void;
-  onApplyMove: (move: string) => void;
+  onStartTurnAnimation: (move: string, plan?: any) => void;
+  onApplyMove: (move: string, plan?: any) => void;
   onStepBack: () => void;
   onStateChange?: (state: PlaybackState) => void;
 }
@@ -97,7 +98,8 @@ export class PlaybackController {
             break;
           }
 
-          const move = this.options.getCurrentMoveNotation();
+          const plan = this.options.getCurrentStepPlan ? this.options.getCurrentStepPlan() : null;
+          const move = plan ? plan.emittedMove : this.options.getCurrentMoveNotation();
           if (!move) {
             this.setState('finished');
             break;
@@ -113,7 +115,10 @@ export class PlaybackController {
             await this.waitForCameraGlide(currentRun);
             this.isBusy = false;
 
-            if (this.runId !== currentRun || this.isPauseRequested) {
+            if (this.runId !== currentRun) {
+              break;
+            }
+            if (this.isPauseRequested) {
               this.setState('paused');
               break;
             }
@@ -124,7 +129,10 @@ export class PlaybackController {
           const waitMs = this.options.getArrowWaitDurationMs();
           await this.waitForArrowDelay(waitMs);
 
-          if (this.runId !== currentRun || this.isPauseRequested) {
+          if (this.runId !== currentRun) {
+            break;
+          }
+          if (this.isPauseRequested) {
             this.setState('paused');
             break;
           }
@@ -132,15 +140,19 @@ export class PlaybackController {
           // Step 3: Layer turn animation
           this.setState('turning');
           this.isBusy = true;
-          this.options.onStartTurnAnimation(move);
+          this.options.onStartTurnAnimation(move, plan);
 
           await this.waitForTurnAnimation(currentRun);
           this.isBusy = false;
 
           // Always logically commit the move once the 3D turn has completed
-          this.options.onApplyMove(move);
+          this.options.onApplyMove(move, plan);
+          await new Promise((resolve) => setTimeout(resolve, 0));
 
-          if (this.runId !== currentRun || this.isPauseRequested) {
+          if (this.runId !== currentRun) {
+            break;
+          }
+          if (this.isPauseRequested) {
             this.setState('paused');
             break;
           }
@@ -184,8 +196,9 @@ export class PlaybackController {
     this.runId++;
     const currentRun = this.runId;
     this.activeRunId = currentRun;
-    const move = this.options.getCurrentMoveNotation();
-    const idx = this.options.getCurrentMoveIndex();
+    const plan = this.options.getCurrentStepPlan ? this.options.getCurrentStepPlan() : null;
+    const move = plan ? plan.emittedMove : this.options.getCurrentMoveNotation();
+    const idx = plan ? plan.stepIndex : this.options.getCurrentMoveIndex();
     const total = this.options.getTotalMoves();
 
     if (!move || idx >= total) return;
@@ -195,9 +208,10 @@ export class PlaybackController {
     this.isBusy = true;
 
     try {
-      this.options.onStartTurnAnimation(move);
+      this.options.onStartTurnAnimation(move, plan);
       await this.waitForTurnAnimation(currentRun);
-      this.options.onApplyMove(move);
+      this.options.onApplyMove(move, plan);
+      await new Promise((resolve) => setTimeout(resolve, 0));
     } finally {
       this.isBusy = false;
       const nextIdx = this.options.getCurrentMoveIndex();

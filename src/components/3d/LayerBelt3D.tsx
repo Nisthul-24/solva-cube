@@ -303,26 +303,52 @@ export const LayerBelt3D: React.FC<LayerBelt3DProps> = ({
     const slabThickness = Math.abs(slabMax - slabMin);
     const midCoord = (slabMin + slabMax) / 2;
 
-    // Glass Belt: slightly larger (1.03x) rounded shell around the turning slab
+    // Glass Belt: bounding box around the turning pieces along the axis with a +0.02 margin for 4x4
     const fullSize = cubeHalfWidth * 2;
-    const scale = 1.03;
-    let sizeX = fullSize * scale;
-    let sizeY = fullSize * scale;
-    let sizeZ = fullSize * scale;
+    let sizeX = fullSize;
+    let sizeY = fullSize;
+    let sizeZ = fullSize;
 
     let posX = 0;
     let posY = 0;
     let posZ = 0;
 
-    if (axis === 'x') {
-      sizeX = slabThickness * scale;
-      posX = midCoord;
-    } else if (axis === 'y') {
-      sizeY = slabThickness * scale;
-      posY = midCoord;
+    if (puzzleType === '4x4') {
+      const margin = 0.02;
+      const fullW = fullSize + 2 * margin; // 4.04
+      const thick = slabThickness + 2 * margin; // 1.04 for slice/outer, 2.04 for wide
+      if (axis === 'x') {
+        sizeX = thick;
+        sizeY = fullW;
+        sizeZ = fullW;
+        posX = midCoord;
+      } else if (axis === 'y') {
+        sizeX = fullW;
+        sizeY = thick;
+        sizeZ = fullW;
+        posY = midCoord;
+      } else {
+        sizeX = fullW;
+        sizeY = fullW;
+        sizeZ = thick;
+        posZ = midCoord;
+      }
     } else {
-      sizeZ = slabThickness * scale;
-      posZ = midCoord;
+      const scale = 1.03;
+      sizeX = fullSize * scale;
+      sizeY = fullSize * scale;
+      sizeZ = fullSize * scale;
+
+      if (axis === 'x') {
+        sizeX = slabThickness * scale;
+        posX = midCoord;
+      } else if (axis === 'y') {
+        sizeY = slabThickness * scale;
+        posY = midCoord;
+      } else {
+        sizeZ = slabThickness * scale;
+        posZ = midCoord;
+      }
     }
 
     const glass = effectiveStyle === 'glass_belt'

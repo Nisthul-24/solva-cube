@@ -18,9 +18,9 @@ import {
   generate4x4RandomScramble,
   deriveColorSchemeFromCorners,
 } from './cube4x4Geometry';
-import { solve4x4Centres } from './cube4x4Centres';
+import { solve4x4CentresFast } from './cube4x4FastCentres';
 import { solve4x4Edges } from './cube4x4Edges';
-import { optimizeMoves4x4Objects } from '../core/moveOptimizer4x4';
+import { optimizeMoves4x4, optimizeMoves4x4Objects } from '../core/moveOptimizer4x4';
 
 export const OLL_PARITY_MACRO = [
   'r2', 'B2', 'U2',
@@ -215,7 +215,7 @@ export class Cube4x4Solver implements Puzzle<Cube4x4State> {
 
     // Stage 1: Build the Centres
     const scheme = deriveColorSchemeFromCorners(cur);
-    const { moves: centreMoves } = solve4x4Centres(cur, scheme.faceColors);
+    const { moves: centreMoves } = solve4x4CentresFast(cur, scheme.faceColors);
     for (const m of centreMoves) {
       addMove(m.notation, 'Stage 1 of 4: Build the Centres');
     }
@@ -231,7 +231,7 @@ export class Cube4x4Solver implements Puzzle<Cube4x4State> {
       { name: 'None', seq: [], isParity: false },
       { name: 'OLL Parity', seq: OLL_PARITY_MACRO, isParity: true },
       { name: 'PLL Parity', seq: PLL_PARITY_MACRO, isParity: true },
-      { name: 'Both Parities', seq: [...OLL_PARITY_MACRO, ...PLL_PARITY_MACRO], isParity: true },
+      { name: 'Both Parities', seq: optimizeMoves4x4([...OLL_PARITY_MACRO, ...PLL_PARITY_MACRO]), isParity: true },
     ];
 
     let solved = false;

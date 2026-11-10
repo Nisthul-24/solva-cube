@@ -63,7 +63,22 @@ export const TurnArrowRibbon3D: React.FC<TurnArrowRibbon3DProps> = ({
 
   const basis = useMemo(() => {
     if (!turnInfo) return null;
-    return getOrthonormalBasis(turnInfo.axis);
+    const axis = new THREE.Vector3(...turnInfo.axis).normalize();
+    const c = new THREE.Vector3(...turnInfo.arcCenter);
+    const camDir = new THREE.Vector3(1, 0.8, 1);
+    const camRel = camDir.clone().sub(c);
+    const camDotA = camRel.dot(axis);
+    let camPerp = camRel.clone().sub(axis.clone().multiplyScalar(camDotA));
+    if (camPerp.lengthSq() < 1e-4) {
+      camPerp = Math.abs(axis.y) < 0.88 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+      const perpDot = camPerp.dot(axis);
+      camPerp.sub(axis.clone().multiplyScalar(perpDot));
+    }
+    camPerp.normalize();
+    const U: [number, number, number] = [camPerp.x, camPerp.y, camPerp.z];
+    const vVec = axis.clone().cross(camPerp).normalize();
+    const V: [number, number, number] = [vVec.x, vVec.y, vVec.z];
+    return { A: [axis.x, axis.y, axis.z] as [number, number, number], U, V };
   }, [turnInfo]);
 
   // Three.js BufferGeometries
@@ -71,9 +86,11 @@ export const TurnArrowRibbon3D: React.FC<TurnArrowRibbon3DProps> = ({
   const ribbonOutlineGeomRef = useRef(new THREE.BufferGeometry());
   const headGeomRef = useRef(new THREE.BufferGeometry());
   const headOutlineGeomRef = useRef(new THREE.BufferGeometry());
+  const groupRef = useRef<THREE.Group>(null);
 
   const lastMidAngleRef = useRef<number | null>(null);
   const headTipPosRef = useRef<THREE.Vector3>(new THREE.Vector3());
+  const spriteRef = useRef<THREE.Sprite>(null);
 
   // Dimensions based on puzzle
   const dims = useMemo(() => {
@@ -91,16 +108,24 @@ export const TurnArrowRibbon3D: React.FC<TurnArrowRibbon3DProps> = ({
     if (puzzleId === 'pyraminx') {
       const isTip = turnInfo.isTipOnly;
       return {
-        ribbonWidth: isTip ? 0.08 : 0.11,
-        headLength: isTip ? 0.26 : 0.35,
-        headWidth: isTip ? 0.16 : 0.22,
-        sweepRad,
+        ribbonWidth: 0.05 * 2.8284, // 5% of model size (model edge length = sqrt(8) ~ 2.8284)
+        headLength: 0.36,
+        headWidth: 0.28,
+        sweepRad: (120 * Math.PI) / 180, // sweep 120 deg
+      };
+    }
+    if (puzzleId === '4x4') {
+      return {
+        ribbonWidth: 0.22,
+        headLength: 0.65,
+        headWidth: 0.42,
+        sweepRad: (90 * Math.PI) / 180, // 90-degree arc for cube
       };
     }
     return {
       ribbonWidth: 0.22,
-      headLength: 0.70,
-      headWidth: 0.44,
+      headLength: 0.65,
+      headWidth: 0.42,
       sweepRad,
     };
   }, [puzzleId, turnInfo]);
@@ -123,24 +148,31 @@ export const TurnArrowRibbon3D: React.FC<TurnArrowRibbon3DProps> = ({
       midAngle
     );
 
-    ribbonGeomRef.current.setAttribute(
-      'position',
-      new THREE.BufferAttribute(arrow.ribbonPositions, 3)
-    );
-    ribbonOutlineGeomRef.current.setAttribute(
-      'position',
-      new THREE.BufferAttribute(arrow.ribbonOutlinePositions, 3)
-    );
-    headGeomRef.current.setAttribute(
-      'position',
-      new THREE.BufferAttribute(arrow.headPositions, 3)
-    );
-    headOutlineGeomRef.current.setAttribute(
-      'position',
-      new THREE.BufferAttribute(arrow.headOutlinePositions, 3)
-    );
+    const updateGeom = (geom: THREE.BufferGeometry, data: Float32Array) => {
+      geom.setAttribute('position', new THREE.BufferAttribute(data, 3));
+      if (geom.attributes.position) {
+        geom.attributes.position.needsUpdate = true;
+      }
+      geom.computeBoundingSphere();
+    };
+
+    updateGeom(ribbonGeomRef.current, arrow.ribbonPositions);
+    updateGeom(ribbonOutlineGeomRef.current, arrow.ribbonOutlinePositions);
+    updateGeom(headGeomRef.current, arrow.headPositions);
+    updateGeom(headOutlineGeomRef.current, arrow.headOutlinePositions);
 
     headTipPosRef.current.set(arrow.arrowhead.tip[0], arrow.arrowhead.tip[1], arrow.arrowhead.tip[2]);
+    if (spriteRef.current && turnInfo.isDouble) {
+      const tip = headTipPosRef.current;
+      const c = new THREE.Vector3(...turnInfo.arcCenter);
+      const dir = tip.clone().sub(c);
+      if (dir.lengthSq() > 1e-4) {
+        dir.normalize();
+        spriteRef.current.position.copy(tip).addScaledVector(dir, 0.35);
+      } else {
+        spriteRef.current.position.copy(tip).add(new THREE.Vector3(0, 0.35, 0));
+      }
+    }
     lastMidAngleRef.current = midAngle;
   };
 
@@ -160,7 +192,8 @@ export const TurnArrowRibbon3D: React.FC<TurnArrowRibbon3DProps> = ({
     const u = new THREE.Vector3(...basis.U);
     const v = new THREE.Vector3(...basis.V);
 
-    const camRel = camera.position.clone().sub(c);
+    const localCam = groupRef.current ? groupRef.current.worldToLocal(camera.position.clone()) : camera.position;
+    const camRel = localCam.clone().sub(c);
     const vU = camRel.dot(u);
     const vV = camRel.dot(v);
     const curMidAngle = Math.atan2(vV, vU);
@@ -183,12 +216,9 @@ export const TurnArrowRibbon3D: React.FC<TurnArrowRibbon3DProps> = ({
         roughness: 0.2,
         metalness: 0.1,
         transparent: true,
-        opacity: 0.85,
+        opacity: 0.95,
         side: THREE.DoubleSide,
-        polygonOffset: true,
-        polygonOffsetFactor: -1,
-        polygonOffsetUnits: -1,
-        depthTest: true,
+        depthTest: false,
         depthWrite: false,
       }),
     []
@@ -199,12 +229,9 @@ export const TurnArrowRibbon3D: React.FC<TurnArrowRibbon3DProps> = ({
       new THREE.MeshBasicMaterial({
         color: '#071626',
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.95,
         side: THREE.DoubleSide,
-        polygonOffset: true,
-        polygonOffsetFactor: 1,
-        polygonOffsetUnits: 1,
-        depthTest: true,
+        depthTest: false,
         depthWrite: false,
       }),
     []
@@ -246,7 +273,7 @@ export const TurnArrowRibbon3D: React.FC<TurnArrowRibbon3DProps> = ({
   }
 
   return (
-    <group renderOrder={900}>
+    <group ref={groupRef} renderOrder={900}>
       {/* 1. Dark outline under ribbon (thicker ribbon) */}
       <mesh geometry={ribbonOutlineGeomRef.current} material={outlineMaterial} renderOrder={900} />
 
@@ -262,7 +289,8 @@ export const TurnArrowRibbon3D: React.FC<TurnArrowRibbon3DProps> = ({
       {/* 5. "x2" badge near head on half turns */}
       {turnInfo.isDouble && x2Texture && (
         <sprite
-          position={[headTipPosRef.current.x, headTipPosRef.current.y + 0.25, headTipPosRef.current.z]}
+          ref={spriteRef}
+          position={[headTipPosRef.current.x, headTipPosRef.current.y + 0.35, headTipPosRef.current.z]}
           scale={[0.55, 0.55, 1]}
           renderOrder={960}
         >

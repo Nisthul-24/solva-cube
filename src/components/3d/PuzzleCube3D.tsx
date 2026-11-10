@@ -37,6 +37,7 @@ interface PuzzleCube3DProps {
   dimension?: 2 | 3 | 4;
   activeFace?: FaceName3x3 | null;
   currentMoveNotation?: string | null;
+  stepPlan?: any;
   isAnimating?: boolean;
   turnDurationMs?: number;
   autoViewMode?: AutoViewOption;
@@ -47,6 +48,7 @@ interface PuzzleCube3DProps {
   interactivePainting?: boolean;
   activeStickerCursor?: number | null;
   isGhostPreview?: boolean;
+  staticProgress?: number;
   cameraAzimuth: number;
   cameraElevation: number;
   onCameraChange?: (azimuth: number, elevation: number) => void;
@@ -137,6 +139,7 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
   dimension = 3,
   activeFace,
   currentMoveNotation,
+  stepPlan,
   isAnimating = false,
   turnDurationMs = 1400,
   autoViewMode = 'minimal',
@@ -147,6 +150,7 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
   interactivePainting = false,
   activeStickerCursor,
   isGhostPreview = false,
+  staticProgress,
   cameraAzimuth,
   cameraElevation,
   onCameraChange,
@@ -214,23 +218,63 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
     };
   }, []);
 
-  // Parse active move (Single source of truth via turnInfo for 3x3/2x2, puzzleEngine for 4x4)
+  // Inverted hull material for moving mesh outline highlight (Requirement 1b)
+  const invertedHullMaterial = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      vertexShader: `
+        uniform float offset;
+        void main() {
+          vec3 transformed = position + normal * offset;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 color;
+        void main() {
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `,
+      uniforms: {
+        offset: { value: 0.035 },
+        color: { value: new THREE.Color('#22d3ee') },
+      },
+      side: THREE.BackSide,
+      depthTest: true,
+      depthWrite: true,
+    });
+  }, []);
+
+  // Parse active move (Single source of truth via stepPlan if available, turnInfo for 3x3/2x2, puzzleEngine for 4x4)
   const activeTurnInfo = useMemo(() => {
-    if (!currentMoveNotation || isSolved) return null;
+    if (isSolved) return null;
     if (dimension === 4) {
+      if (stepPlan) {
+        return {
+          axis: stepPlan.axisName || 'y',
+          layers: stepPlan.layers || [3],
+          angle: stepPlan.angle,
+          is4x4: true,
+          turningPieceSet: stepPlan.turningPieceSet,
+          cubieIds: stepPlan.cubieIds,
+          stepPlan,
+        };
+      }
+      if (!currentMoveNotation) return null;
       const eng = getPuzzleEngine('4x4');
       const m = eng.getMove(currentMoveNotation);
       if (!m) return null;
       return {
         axis: m.axisName || 'y',
-        layers: (m.axisName === 'x' ? [Math.round(m.layerCentroid[0] + 1.5)] : m.axisName === 'y' ? [Math.round(m.layerCentroid[1] + 1.5)] : [Math.round(m.layerCentroid[2] + 1.5)]),
+        layers: m.layers || [3],
         angle: m.angle,
         is4x4: true,
         turningPieceSet: m.turningPieceSet,
+        cubieIds: m.turningPieceIds,
       };
     }
+    if (!currentMoveNotation) return null;
     return turnInfo(currentMoveNotation);
-  }, [currentMoveNotation, isSolved, dimension]);
+  }, [stepPlan, currentMoveNotation, isSolved, dimension]);
 
   const activeAxis = activeTurnInfo?.axis || 'y';
   const activeLayer = (activeTurnInfo as any)?.layer ?? 1;
@@ -245,10 +289,19 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
 
   const pushOffset = useMemo<[number, number, number]>(() => {
     if (!activeTurnInfo || isSolved || pushAmount === 0) return [0, 0, 0];
-    const sign = dimension === 4
-      ? (activeLayers.includes(3) || activeLayers.includes(2) ? 1 : -1)
-      : activeLayer;
-    const offset = pushAmount * sign;
+    if (dimension === 4) {
+      // Never lift inner slices (which would create a visible interior gap)
+      const isInnerOnly = activeLayers.length === 1 && (activeLayers[0] === 1 || activeLayers[0] === 2);
+      if (isInnerOnly) return [0, 0, 0];
+      const sign = activeLayers.includes(3) ? 1 : -1;
+      const offset = pushAmount * sign;
+      return [
+        activeAxis === 'x' ? offset : 0,
+        activeAxis === 'y' ? offset : 0,
+        activeAxis === 'z' ? offset : 0,
+      ];
+    }
+    const offset = pushAmount * activeLayer;
     return [
       activeAxis === 'x' ? offset : 0,
       activeAxis === 'y' ? offset : 0,
@@ -520,12 +573,12 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
   }, [cubeState, dimension, activeTurnInfo, isSolved, activeAxis, activeLayer]);
 
   const stationaryCubies = useMemo(
-    () => allCubies.filter((c) => (!isAnimating && !isGhostPreview) || !c.isLayerActive),
-    [allCubies, isAnimating, isGhostPreview]
+    () => allCubies.filter((c) => (!isAnimating && !isGhostPreview && staticProgress === undefined) || !c.isLayerActive),
+    [allCubies, isAnimating, isGhostPreview, staticProgress]
   );
   const turningCubies = useMemo(
-    () => (isAnimating || isGhostPreview ? allCubies.filter((c) => c.isLayerActive) : []),
-    [allCubies, isAnimating, isGhostPreview]
+    () => (isAnimating || isGhostPreview || staticProgress !== undefined ? allCubies.filter((c) => c.isLayerActive) : []),
+    [allCubies, isAnimating, isGhostPreview, staticProgress]
   );
 
   // Animation trigger
@@ -588,18 +641,43 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
       } else {
         pivotRef.current.rotation.z = angle;
       }
+    } else if (staticProgress !== undefined && !isAnimating && !isGhostPreview && pivotRef.current && targetAngle !== 0) {
+      const angle = targetAngle * staticProgress;
+      pivotRef.current.rotation.set(0, 0, 0);
+      if (activeAxis === 'x') {
+        pivotRef.current.rotation.x = angle;
+      } else if (activeAxis === 'y') {
+        pivotRef.current.rotation.y = angle;
+      } else {
+        pivotRef.current.rotation.z = angle;
+      }
     } else if (!isAnimating && pivotRef.current && !isGhostPreview) {
       pivotRef.current.rotation.set(0, 0, 0);
     }
 
     // Moving Layer Chip Projection
     if (onMovingChipChange) {
-      if (activeTurnInfo && !isSolved && currentMoveNotation) {
+      const activeNotation = stepPlan ? stepPlan.emittedMove : currentMoveNotation;
+      if (activeTurnInfo && !isSolved && activeNotation) {
         const pType: '3x3' | '2x2' | '4x4' = dimension === 4 ? '4x4' : dimension === 2 ? '2x2' : '3x3';
-        const unified = getPuzzleTurnInfo(pType, currentMoveNotation);
-        const dist = dimension === 4 ? 2.15 : dimension === 2 ? 1.05 : 1.62;
-        const norm = new THREE.Vector3(...unified.axis);
-        const pos = norm.clone().multiplyScalar(dist);
+        const unified = getPuzzleTurnInfo(pType, activeNotation);
+        let pos: THREE.Vector3;
+        let norm: THREE.Vector3;
+        if (dimension === 4) {
+          if (stepPlan) {
+            pos = new THREE.Vector3(...stepPlan.layerCentroid).multiplyScalar(0.6);
+            norm = new THREE.Vector3(...stepPlan.axis);
+          } else {
+            const eng = getPuzzleEngine('4x4');
+            const m = eng.getMove(activeNotation);
+            pos = m ? new THREE.Vector3(...m.layerCentroid).multiplyScalar(0.6) : new THREE.Vector3();
+            norm = m ? new THREE.Vector3(...m.axis) : new THREE.Vector3(...unified.axis);
+          }
+        } else {
+          const dist = dimension === 2 ? 1.05 : 1.62;
+          norm = new THREE.Vector3(...unified.axis);
+          pos = norm.clone().multiplyScalar(dist);
+        }
         const camDir = new THREE.Vector3().subVectors(camera.position, pos).normalize();
         const dot = norm.dot(camDir);
         const isFacing = dot > -0.2;
@@ -607,7 +685,7 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
         const screenX = (proj.x * 0.5 + 0.5) * size.width;
         const screenY = (-proj.y * 0.5 + 0.5) * size.height;
         onMovingChipChange({
-          text: unified.layerName,
+          text: stepPlan ? stepPlan.layerName : unified.layerName,
           screenX,
           screenY,
           visible: isFacing && !isAnimating,
@@ -671,6 +749,11 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
       <group key={c.id} position={[px, py, pz]}>
         {/* Cubie near-black plastic body (#0b0d12, roughness 0.35) */}
         <mesh geometry={cubieGeometry} material={cubieMaterial} castShadow receiveShadow />
+
+        {/* Highlight: Inverted hull outline around turning meshes (Requirement 1b) */}
+        {isLayer && dimension === 4 && !isAnimating && (
+          <mesh geometry={cubieGeometry} material={invertedHullMaterial} />
+        )}
 
         {/* Stickers */}
         {c.stickers.map((st: any, sidx: number) => {
@@ -762,6 +845,75 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
     );
   };
 
+  // Dev debug overlay (?debug=1)
+  const isDebug = typeof window !== 'undefined' && Boolean((window as any).location?.search?.includes('debug=1'));
+
+  const debugOverlayData = useMemo(() => {
+    if (!isDebug || !currentMoveNotation || isSolved || dimension !== 4) return null;
+    const eng = getPuzzleEngine('4x4');
+    const m = eng.getMove(currentMoveNotation);
+    if (!m) return null;
+
+    const A = m.axis;
+    // 1. Axis line: from -5.0 * A to +5.0 * A
+    const axisPts = [
+      new THREE.Vector3(-5.0 * A[0], -5.0 * A[1], -5.0 * A[2]),
+      new THREE.Vector3(5.0 * A[0], 5.0 * A[1], 5.0 * A[2]),
+    ];
+    const axisLineGeom = new THREE.BufferGeometry().setFromPoints(axisPts);
+
+    // 2. Bounding box of moving set (wireframe)
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (const p of eng.pieces) {
+      if (m.turningPieceSet.has(p.id)) {
+        const [cx, cy, cz] = p.homeCentroid;
+        if (cx - 0.5 < minX) minX = cx - 0.5;
+        if (cx + 0.5 > maxX) maxX = cx + 0.5;
+        if (cy - 0.5 < minY) minY = cy - 0.5;
+        if (cy + 0.5 > maxY) maxY = cy + 0.5;
+        if (cz - 0.5 < minZ) minZ = cz - 0.5;
+        if (cz + 0.5 > maxZ) maxZ = cz + 0.5;
+      }
+    }
+    const boxSize: [number, number, number] = [maxX - minX + 0.04, maxY - minY + 0.04, maxZ - minZ + 0.04];
+    const boxCenter: [number, number, number] = [(minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2];
+    const boxGeom = new THREE.BoxGeometry(...boxSize);
+    const boxWireframeGeom = new THREE.WireframeGeometry(boxGeom);
+
+    // 3. Arrow center dot & line to layer centroid (Part B item 3)
+    const arrowCenterVec = new THREE.Vector3(...m.arrowCenter);
+    const layerCentroidVec = new THREE.Vector3(...m.layerCentroid);
+    const centerLineGeom = new THREE.BufferGeometry().setFromPoints([arrowCenterVec, layerCentroidVec]);
+
+    // 4. Arrow tangent at nearest point to turning set centroid
+    const centroid = new THREE.Vector3(...m.layerCentroid);
+    let nearestPt: THREE.Vector3 | null = null;
+    let minDist = Infinity;
+    for (const pt of m.arrow.arcPoints) {
+      const v = new THREE.Vector3(...pt);
+      const d = v.distanceTo(centroid);
+      if (d < minDist) {
+        minDist = d;
+        nearestPt = v;
+      }
+    }
+    const tangent = new THREE.Vector3(...m.arrow.endTangent).normalize();
+    const tangentEnd = nearestPt ? nearestPt.clone().addScaledVector(tangent, 1.2) : new THREE.Vector3();
+    const tangentLineGeom = nearestPt
+      ? new THREE.BufferGeometry().setFromPoints([nearestPt, tangentEnd])
+      : new THREE.BufferGeometry();
+
+    return {
+      axisLineGeom,
+      boxWireframeGeom,
+      boxCenter,
+      arrowCenterVec,
+      centerLineGeom,
+      tangentLineGeom,
+    };
+  }, [isDebug, currentMoveNotation, isSolved, dimension]);
+
   return (
     <>
       {/* Unified CameraRig owning camera pose with smooth slerp gliding */}
@@ -771,7 +923,7 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
         autoViewMode={autoViewMode}
         isSlowSpeed={turnDurationMs >= 2800}
         isAnimatingLayer={isAnimating}
-        baseDistance={dimension === 4 ? 6.2 : 4.8}
+        baseDistance={dimension === 4 ? 11.0 : 4.8}
         userAzimuth={cameraAzimuth}
         userElevation={cameraElevation}
         onCameraGlideComplete={onCameraMoveComplete}
@@ -792,11 +944,11 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
         </mesh>
       )}
 
-      {/* Main Cube Group - scaled for 2x2 to fill 60% stage and 4x4 to fill 70% */}
+      {/* Main Cube Group - scaled for 2x2 to fill 60% stage and 4x4 with constant framing */}
       <group
         scale={
           dimension === 4
-            ? [0.75, 0.75, 0.75]
+            ? [0.6, 0.6, 0.6]
             : dimension === 2
             ? [1.38, 1.38, 1.38]
             : [1, 1, 1]
@@ -809,10 +961,10 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
           {turningCubies.map((c) => renderCubie(c, true))}
         </group>
 
-        {/* Section 1b: Continuous thin bright layer belt loops */}
-        {currentMoveNotation && !isSolved && (
+        {/* Layer belt for 2x2 and 3x3 only (4x4 uses moving mesh inverted-hull outline) */}
+        {currentMoveNotation && !isSolved && dimension !== 4 && (
           <LayerBelt3D
-            puzzleType={dimension === 4 ? '4x4' : dimension === 2 ? '2x2' : '3x3'}
+            puzzleType={dimension === 2 ? '2x2' : '3x3'}
             move={currentMoveNotation}
             highlightStyle={highlightStyle}
             visible={!isAnimating}
@@ -820,12 +972,37 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
         )}
 
         {/* Unified Direction Arrow */}
-        {currentMoveNotation && !isSolved && (
+        {(stepPlan?.emittedMove || currentMoveNotation) && !isSolved && (
           <TurnArrowRibbon3D
             puzzleId={dimension === 4 ? '4x4' : dimension === 2 ? '2x2' : '3x3'}
-            move={currentMoveNotation}
+            move={stepPlan?.emittedMove || currentMoveNotation!}
             visible={!isAnimating}
           />
+        )}
+
+        {/* ?debug=1 Overlays under puzzle root */}
+        {isDebug && debugOverlayData && (
+          <group renderOrder={999}>
+            {/* 1. Axis Line (bright yellow) */}
+            <primitive object={new THREE.Line(debugOverlayData.axisLineGeom, new THREE.LineBasicMaterial({ color: '#fbbf24', depthTest: false }))} />
+
+            {/* 2. Wireframe Bounding Box of Moving Set (cyan/sky blue) */}
+            <group position={debugOverlayData.boxCenter}>
+              <primitive object={new THREE.LineSegments(debugOverlayData.boxWireframeGeom, new THREE.LineBasicMaterial({ color: '#38bdf8', depthTest: false }))} />
+            </group>
+
+            {/* 3. Dot at arrow's centre (orange/red dot) */}
+            <mesh position={debugOverlayData.arrowCenterVec}>
+              <sphereGeometry args={[0.08, 16, 16]} />
+              <meshBasicMaterial color="#f97316" depthTest={false} />
+            </mesh>
+
+            {/* 4. Line from arrow centre to layer centroid (green line) */}
+            <primitive object={new THREE.Line(debugOverlayData.centerLineGeom, new THREE.LineBasicMaterial({ color: '#22c55e', depthTest: false }))} />
+
+            {/* 5. Arrow Tangent Vector at nearest arc point (bright magenta) */}
+            <primitive object={new THREE.Line(debugOverlayData.tangentLineGeom, new THREE.LineBasicMaterial({ color: '#ec4899', depthTest: false }))} />
+          </group>
         )}
       </group>
     </>

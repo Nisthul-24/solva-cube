@@ -7,7 +7,7 @@ import {
   turnInfo4x4,
 } from './cube4x4Geometry';
 import { areAllCentresSolved } from './cube4x4Centres';
-import { optimizeMoves4x4Objects } from '../core/moveOptimizer4x4';
+import { optimizeMoves4x4, optimizeMoves4x4Objects } from '../core/moveOptimizer4x4';
 
 export interface EdgeWing {
   face1: FaceName3x3;
@@ -60,25 +60,24 @@ export function getUnpairedEdges(state: Cube4x4State): EdgePairDef[] {
   return EDGE_PAIRS_4X4.filter((e) => !isEdgePaired(state, e));
 }
 
-const FLIP_FR = ['R', 'U', "R'", 'F', "R'", "F'", 'R'];
-const MACRO_PAIR = ["Uw'", ...FLIP_FR, 'Uw'];
-
-const ROT_TO_FL: Record<string, string[]> = {
+// Setups to FL when FR is not yet occupied (can use F, L, U, B, D)
+export const SETUP_FIRST_TO_FL: Record<string, string[]> = {
   FL: [],
-  FR: ['Uw', "Dw'"],
-  BL: ["Uw'", 'Dw'],
-  BR: ['Uw', "Dw'", 'Uw', "Dw'"],
-  UF: ["Fw'", 'Bw'],
-  DF: ['Fw', "Bw'"],
-  UL: ["Rw'", 'Lw'],
-  DL: ['Rw', "Lw'"],
-  UR: ["Rw'", 'Lw', 'Uw', "Dw'"],
-  DR: ['Rw', "Lw'", 'Uw', "Dw'"],
-  UB: ["Rw'", 'Lw', "Fw'", 'Bw'],
-  DB: ['Rw', "Lw'", 'Fw', "Bw'"],
+  UL: ['L'],
+  DL: ["L'"],
+  BL: ['L2'],
+  DF: ['F'],
+  UF: ["F'"],
+  FR: ['F2'],
+  UB: ['U2', "F'"],
+  DB: ['D2', 'F'],
+  UR: ["U'", "F'"],
+  DR: ['D', 'F'],
+  BR: ['B2', 'L2'],
 };
 
-const SETUP_TO_FR: Record<string, string[]> = {
+// Setups to FR when FL is ALREADY occupied (must only use R, U, B, D)
+export const SETUP_SECOND_TO_FR: Record<string, string[]> = {
   FR: [],
   UR: ["R'"],
   UB: ['U', "R'"],
@@ -92,6 +91,40 @@ const SETUP_TO_FR: Record<string, string[]> = {
   DB: ["D'", 'R'],
 };
 
+// Setups to FR when FL is not yet occupied (can use F, R, U, B, D)
+export const SETUP_FIRST_TO_FR: Record<string, string[]> = {
+  FR: [],
+  UR: ["R'"],
+  DR: ['R'],
+  BR: ['R2'],
+  DF: ["F'"],
+  UF: ['F'],
+  FL: ['F2'],
+  UB: ['U2', 'F'],
+  DB: ['D2', "F'"],
+  UL: ['U', 'F'],
+  DL: ["D'", "F'"],
+  BL: ['B2', 'R2'],
+};
+
+// Setups to FL when FR is ALREADY occupied (must only use L, U, B, D)
+export const SETUP_SECOND_TO_FL: Record<string, string[]> = {
+  FL: [],
+  UL: ['L'],
+  UB: ["U'", 'L'],
+  UR: ['U2', 'L'],
+  UF: ['U', 'L'],
+  BL: ['L2'],
+  BR: ['B2', 'L2'],
+  DL: ["L'"],
+  DF: ["D'", "L'"],
+  DB: ['D', "L'"],
+  DR: ['D2', "L'"],
+};
+
+export const SETUP_TO_FL = SETUP_FIRST_TO_FL;
+export const SETUP_TO_FR = SETUP_SECOND_TO_FR;
+
 function invert(m: string): string {
   if (m.endsWith("'")) return m.slice(0, -1);
   if (m.endsWith('2')) return m;
@@ -102,113 +135,254 @@ function invertSeq(seq: string[]): string[] {
   return [...seq].reverse().map(invert);
 }
 
+const FLIP_FR = ['R', 'U', "R'", 'F', "R'", "F'", 'R'];
+const MACRO_PAIR = ["Uw'", ...FLIP_FR, 'Uw'];
+
+// Top layer replacements into FR
+const REPLACEMENTS_FR_TOP = [
+  ['R', "U'", "R'"],
+  ['R', 'U', "R'"],
+  ['R', 'U2', "R'"],
+  ["F'", 'U', 'F'],
+  ["F'", "U'", 'F'],
+  ["F'", 'U2', 'F'],
+];
+
+// Bottom layer replacements into FR
+const REPLACEMENTS_FR_BOTTOM = [
+  ["R'", 'D', 'R'],
+  ["R'", "D'", 'R'],
+  ["R'", 'D2', 'R'],
+  ['F', "D'", "F'"],
+  ['F', 'D', "F'"],
+  ['F', 'D2', "F'"],
+];
+
+const CANDIDATES: string[][] = [];
+
+// Uw slice with top replacements
+for (const rep of REPLACEMENTS_FR_TOP) {
+  CANDIDATES.push(["Uw'", ...rep, 'Uw']);
+  CANDIDATES.push(['Uw', ...rep, "Uw'"]);
+  // With U pre-alignment
+  CANDIDATES.push(["Uw'", 'U', ...rep, "U'", 'Uw']);
+  CANDIDATES.push(["Uw'", "U'", ...rep, 'U', 'Uw']);
+  CANDIDATES.push(["Uw'", 'U2', ...rep, 'U2', 'Uw']);
+  CANDIDATES.push(['Uw', 'U', ...rep, "U'", "Uw'"]);
+  CANDIDATES.push(['Uw', "U'", ...rep, 'U', "Uw'"]);
+  CANDIDATES.push(['Uw', 'U2', ...rep, 'U2', "Uw'"]);
+}
+
+// Dw slice with bottom replacements
+for (const rep of REPLACEMENTS_FR_BOTTOM) {
+  CANDIDATES.push(['Dw', ...rep, "Dw'"]);
+  CANDIDATES.push(["Dw'", ...rep, 'Dw']);
+  // With D pre-alignment
+  CANDIDATES.push(['Dw', 'D', ...rep, "D'", "Dw'"]);
+  CANDIDATES.push(['Dw', "D'", ...rep, 'D', "Dw'"]);
+  CANDIDATES.push(['Dw', 'D2', ...rep, 'D2', "Dw'"]);
+  CANDIDATES.push(["Dw'", 'D', ...rep, "D'", 'Dw']);
+  CANDIDATES.push(["Dw'", "D'", ...rep, 'D', 'Dw']);
+  CANDIDATES.push(["Dw'", 'D2', ...rep, 'D2', 'Dw']);
+}
+
+// Uw2 and Dw2 slice candidates
+for (const rep of REPLACEMENTS_FR_TOP.slice(0, 3)) {
+  CANDIDATES.push(['Uw2', ...rep, 'Uw2']);
+}
+for (const rep of REPLACEMENTS_FR_BOTTOM.slice(0, 3)) {
+  CANDIDATES.push(['Dw2', ...rep, 'Dw2']);
+}
+
+// 7-move direct L2E algorithms
+CANDIDATES.push(['Dw', 'R', "F'", 'U', "R'", 'F', "Dw'"]);
+CANDIDATES.push(["Dw'", 'R', "F'", 'U', "R'", 'F', 'Dw']);
+CANDIDATES.push(['Uw', 'R', "F'", 'U', "R'", 'F', "Uw'"]);
+CANDIDATES.push(["Uw'", 'R', "F'", 'U', "R'", 'F', 'Uw']);
+CANDIDATES.push(['Dw', "F'", 'L', "U'", 'F', "L'", "Dw'"]);
+CANDIDATES.push(["Dw'", "F'", 'L', "U'", 'F', "L'", 'Dw']);
+CANDIDATES.push(['Uw', "F'", 'L', "U'", 'F', "L'", "Uw'"]);
+CANDIDATES.push(["Uw'", "F'", 'L', "U'", 'F', "L'", 'Uw']);
+
+// Flips and fallback
+for (const rep of REPLACEMENTS_FR_TOP.slice(0, 3)) {
+  CANDIDATES.push([...FLIP_FR, "Uw'", ...rep, 'Uw']);
+  CANDIDATES.push([...FLIP_FR, 'Uw', ...rep, "Uw'"]);
+}
+CANDIDATES.push(MACRO_PAIR);
+CANDIDATES.push([...FLIP_FR, ...MACRO_PAIR]);
+
 /**
- * Stage 2: Edge Pairing
- * Pairs all 12 edge pairs while preserving all 6 centres.
+ * Stage 2: Fast Edge Pairing
+ * Pairs all 12 edge pairs using greedy minimum-setup outer face turns
+ * and direct slice-replace insertions without whole-cube rotations.
  */
 export function solve4x4Edges(
   initialState: Cube4x4State,
   targetColors: Record<FaceName3x3, CubeColor>
 ): { moves: Move[]; state: Cube4x4State } {
   let cur = initialState;
-  const moves: Move[] = [];
+  const rawMoves: string[] = [];
 
-  function doMove(notation: string) {
-    cur = apply4x4Move(cur, notation);
+  let iters = 0;
+  while (!areAllEdgesPaired(cur) && iters++ < 30) {
+    const unpaired = getUnpairedEdges(cur);
+    if (unpaired.length === 0) break;
+
+    let bestOption: {
+      setups: string[];
+      cand: string[];
+      score: number;
+    } | null = null;
+
+    const initialPairedCount = EDGE_PAIRS_4X4.filter((e) => isEdgePaired(cur, e)).length;
+
+    for (const targetEdge of unpaired) {
+      const c1 = cur[targetEdge.w1.face1][targetEdge.w1.idx1];
+      const c2 = cur[targetEdge.w1.face2][targetEdge.w1.idx2];
+
+      // Config 1: target -> FL, partner -> FR
+      {
+        const setupFL = SETUP_FIRST_TO_FL[targetEdge.name] || [];
+        let simFL = cur;
+        for (const m of setupFL) simFL = apply4x4Move(simFL, m);
+
+        let currentPartnerEdge = 'FR';
+        for (const ep of EDGE_PAIRS_4X4) {
+          if (ep.name === 'FL') continue;
+          for (const w of [ep.w1, ep.w2]) {
+            const wc1 = simFL[w.face1][w.idx1];
+            const wc2 = simFL[w.face2][w.idx2];
+            if ((wc1 === c1 && wc2 === c2) || (wc1 === c2 && wc2 === c1)) {
+              currentPartnerEdge = ep.name;
+              break;
+            }
+          }
+          if (currentPartnerEdge !== 'FR') break;
+        }
+
+        const setupFR = SETUP_SECOND_TO_FR[currentPartnerEdge] || [];
+        let simFR = simFL;
+        for (const m of setupFR) simFR = apply4x4Move(simFR, m);
+
+        for (const cand of CANDIDATES) {
+          let sim = simFR;
+          for (const m of cand) sim = apply4x4Move(sim, m);
+
+          if (areAllCentresSolved(sim, targetColors)) {
+            const count = EDGE_PAIRS_4X4.filter((e) => isEdgePaired(sim, e)).length;
+            if (count > initialPairedCount) {
+              const totalLen = setupFL.length + setupFR.length + cand.length;
+              const score = count * 1000 - totalLen;
+              if (!bestOption || score > bestOption.score) {
+                bestOption = { setups: [...setupFL, ...setupFR], cand, score };
+              }
+            }
+          }
+        }
+      }
+
+      // Config 2: target -> FR, partner -> FL
+      {
+        const setupFR = SETUP_FIRST_TO_FR[targetEdge.name] || [];
+        let simFR = cur;
+        for (const m of setupFR) simFR = apply4x4Move(simFR, m);
+
+        let currentPartnerEdge = 'FL';
+        for (const ep of EDGE_PAIRS_4X4) {
+          if (ep.name === 'FR') continue;
+          for (const w of [ep.w1, ep.w2]) {
+            const wc1 = simFR[w.face1][w.idx1];
+            const wc2 = simFR[w.face2][w.idx2];
+            if ((wc1 === c1 && wc2 === c2) || (wc1 === c2 && wc2 === c1)) {
+              currentPartnerEdge = ep.name;
+              break;
+            }
+          }
+          if (currentPartnerEdge !== 'FL') break;
+        }
+
+        const setupFL = SETUP_SECOND_TO_FL[currentPartnerEdge] || [];
+        let simFL = simFR;
+        for (const m of setupFL) simFL = apply4x4Move(simFL, m);
+
+        for (const cand of CANDIDATES) {
+          let sim = simFL;
+          for (const m of cand) sim = apply4x4Move(sim, m);
+
+          if (areAllCentresSolved(sim, targetColors)) {
+            const count = EDGE_PAIRS_4X4.filter((e) => isEdgePaired(sim, e)).length;
+            if (count > initialPairedCount) {
+              const totalLen = setupFR.length + setupFL.length + cand.length;
+              const score = count * 1000 - totalLen;
+              if (!bestOption || score > bestOption.score) {
+                bestOption = { setups: [...setupFR, ...setupFL], cand, score };
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (!bestOption) {
+      // Fallback with unsetup
+      const targetEdge = unpaired[0];
+      const setupFL = SETUP_TO_FL[targetEdge.name] || [];
+      const unsetupFL = invertSeq(setupFL);
+      let simFL = cur;
+      for (const m of setupFL) simFL = apply4x4Move(simFL, m);
+
+      let currentPartnerEdge = 'FR';
+      const c1 = cur[targetEdge.w1.face1][targetEdge.w1.idx1];
+      const c2 = cur[targetEdge.w1.face2][targetEdge.w1.idx2];
+      for (const ep of EDGE_PAIRS_4X4) {
+        if (ep.name === 'FL') continue;
+        for (const w of [ep.w1, ep.w2]) {
+          const wc1 = simFL[w.face1][w.idx1];
+          const wc2 = simFL[w.face2][w.idx2];
+          if ((wc1 === c1 && wc2 === c2) || (wc1 === c2 && wc2 === c1)) {
+            currentPartnerEdge = ep.name;
+            break;
+          }
+        }
+        if (currentPartnerEdge !== 'FR') break;
+      }
+      const setupFR = SETUP_TO_FR[currentPartnerEdge] || [];
+      const unsetupFR = invertSeq(setupFR);
+
+      for (const m of setupFL) cur = apply4x4Move(cur, m);
+      rawMoves.push(...setupFL);
+      for (const m of setupFR) cur = apply4x4Move(cur, m);
+      rawMoves.push(...setupFR);
+      for (const m of MACRO_PAIR) cur = apply4x4Move(cur, m);
+      rawMoves.push(...MACRO_PAIR);
+      for (const m of unsetupFR) cur = apply4x4Move(cur, m);
+      rawMoves.push(...unsetupFR);
+      for (const m of unsetupFL) cur = apply4x4Move(cur, m);
+      rawMoves.push(...unsetupFL);
+      continue;
+    }
+
+    // Apply bestOption directly without unsetup!
+    for (const m of bestOption.setups) cur = apply4x4Move(cur, m);
+    rawMoves.push(...bestOption.setups);
+
+    for (const m of bestOption.cand) cur = apply4x4Move(cur, m);
+    rawMoves.push(...bestOption.cand);
+  }
+
+  const optNotations = optimizeMoves4x4(rawMoves);
+  const moves: Move[] = optNotations.map((notation) => {
     const t = turnInfo4x4(notation);
-    moves.push({
+    return {
       notation,
       face: notation[0].toUpperCase(),
       direction: t.direction,
       amount: t.direction === 'DOUBLE' ? 2 : t.direction === 'CCW' ? -1 : 1,
       description: t.wording,
       stage: 'Stage 2 of 4: Pair all 12 Edges',
-    });
-  }
+    };
+  });
 
-  function doMoves(seq: string[]) {
-    for (const m of seq) doMove(m);
-  }
-
-  let iters = 0;
-  while (!areAllEdgesPaired(cur) && iters++ < 40) {
-    const unpaired = getUnpairedEdges(cur);
-    if (unpaired.length === 0) break;
-
-    // Pick first unpaired edge
-    const targetEdge = unpaired[0];
-    const c1 = cur[targetEdge.w1.face1][targetEdge.w1.idx1];
-    const c2 = cur[targetEdge.w1.face2][targetEdge.w1.idx2];
-
-    // Rotate targetEdge to FL
-    const rot = ROT_TO_FL[targetEdge.name] || [];
-    const unrot = invertSeq(rot);
-    doMoves(rot);
-
-    // Now targetEdge is at FL.
-    // Re-find which slot now contains the partner wing!
-    let currentPartnerEdge: string = 'FR';
-    for (const ep of EDGE_PAIRS_4X4) {
-      if (ep.name === 'FL') continue;
-      for (const w of [ep.w1, ep.w2]) {
-        const wc1 = cur[w.face1][w.idx1];
-        const wc2 = cur[w.face2][w.idx2];
-        if ((wc1 === c1 && wc2 === c2) || (wc1 === c2 && wc2 === c1)) {
-          currentPartnerEdge = ep.name;
-          break;
-        }
-      }
-      if (currentPartnerEdge !== 'FR') break;
-    }
-
-    // Bring currentPartnerEdge to FR
-    const setupFR = SETUP_TO_FR[currentPartnerEdge] || [];
-    const unsetupFR = invertSeq(setupFR);
-    doMoves(setupFR);
-
-    // Test candidates: which one maximizes paired edges count while preserving centres
-    const candidates = [
-      ["Uw'", 'R', "U'", "R'", 'Uw'],
-      ["Uw'", 'R', 'U', "R'", 'Uw'],
-      ['Uw', 'R', "U'", "R'", "Uw'"],
-      ['Uw', 'R', 'U', "R'", "Uw'"],
-      ["Uw'", 'R', 'U2', "R'", 'Uw'],
-      ['Uw', 'R', 'U2', "R'", "Uw'"],
-      MACRO_PAIR,
-      [...FLIP_FR, ...MACRO_PAIR],
-      [...MACRO_PAIR, ...FLIP_FR],
-      [...FLIP_FR, ...MACRO_PAIR, ...FLIP_FR],
-    ];
-
-    let bestCand: string[] = candidates[0];
-    let bestPairedCount = -1;
-    const initialPairedCount = EDGE_PAIRS_4X4.filter((e) => isEdgePaired(cur, e)).length;
-
-    for (const cand of candidates) {
-      let sim = cur;
-      for (const m of cand) sim = apply4x4Move(sim, m);
-      for (const m of unsetupFR) sim = apply4x4Move(sim, m);
-      for (const m of unrot) sim = apply4x4Move(sim, m);
-
-      if (areAllCentresSolved(sim, targetColors)) {
-        const count = EDGE_PAIRS_4X4.filter((e) => isEdgePaired(sim, e)).length;
-        if (count > bestPairedCount) {
-          bestPairedCount = count;
-          bestCand = cand;
-        }
-      }
-    }
-
-    if (bestPairedCount <= initialPairedCount) {
-      // Fallback to standard macro
-      bestCand = MACRO_PAIR;
-    }
-
-    doMoves(bestCand);
-    doMoves(unsetupFR);
-    doMoves(unrot);
-  }
-
-  const optMoves = optimizeMoves4x4Objects(moves);
-  return { moves: optMoves, state: cur };
+  return { moves, state: cur };
 }

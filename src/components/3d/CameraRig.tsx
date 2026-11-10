@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { AutoViewOption } from '../../store/settingsStore';
-import { Vec3, normalize, dot } from '../../solvers/pyraminx/pyraminxGeometry';
+import { Vec3, normalize, dot, rotateAroundAxis } from '../../solvers/pyraminx/pyraminxGeometry';
 import { getPuzzleTurnInfo } from './puzzleTurnInfo';
 
 // Global mount counter tracking Canvas/scene mounts across the app
@@ -18,6 +18,32 @@ if (typeof window !== 'undefined') {
 export const MIN_POLAR_RAD = (15 * Math.PI) / 180; // 15 degrees
 export const MAX_POLAR_RAD = (165 * Math.PI) / 180; // 165 degrees
 export const MAX_STEP_ROTATION_RAD = (60 * Math.PI) / 180; // 60 degrees
+
+/**
+ * Clamps a direction vector for Pyraminx so elevation stays within [15°, 60°]
+ * (polar angle between 30° and 75° from +Y, never from below base).
+ */
+export function clampPyraminxPolarAngle(dir: THREE.Vector3): THREE.Vector3 {
+  const d = dir.clone().normalize();
+  const minPolar = (35 * Math.PI) / 180; // max elevation 55° (within [15°, 60°])
+  const maxPolar = (49.5 * Math.PI) / 180; // min elevation 40.5° (guarantees view angle >= 20° to all face normals across all azimuths)
+  const polar = Math.acos(Math.max(-1, Math.min(1, d.y)));
+
+  const clampedPolar = Math.max(minPolar, Math.min(maxPolar, polar));
+  const sinTarget = Math.sin(clampedPolar);
+  const cosTarget = Math.cos(clampedPolar);
+  const xzLen = Math.hypot(d.x, d.z);
+
+  if (xzLen < 1e-5) {
+    d.x = sinTarget;
+    d.z = 0;
+  } else {
+    d.x = (d.x / xzLen) * sinTarget;
+    d.z = (d.z / xzLen) * sinTarget;
+  }
+  d.y = cosTarget;
+  return d.normalize();
+}
 
 /**
  * Clamps a direction vector so its polar angle with (0,1,0) stays within [15°, 165°].
@@ -68,7 +94,7 @@ export function getNearestAcceptableCamera(
   currentDir: THREE.Vector3,
   autoViewMode: AutoViewOption
 ): { targetDir: THREE.Vector3; changed: boolean } {
-  const cur = clampPolarAngle(currentDir);
+  const cur = puzzleId === 'pyraminx' ? clampPyraminxPolarAngle(currentDir) : clampPolarAngle(currentDir);
   if (!move || autoViewMode === 'off') {
     return { targetDir: cur, changed: false };
   }
@@ -78,7 +104,7 @@ export function getNearestAcceptableCamera(
 
   try {
     const info = getPuzzleTurnInfo(puzzleId, move);
-    axisVec = new THREE.Vector3(...info.axis).normalize();
+    axisVec = new THREE.Vector3(...(info.outwardNormal || info.axis)).normalize();
     // In our turnInfo, info.axis points toward the viewer's side of the turning layer
     // (i.e. +1 for U/R/F, -1 for D/L/B)
     layerSign = 1;
@@ -131,13 +157,32 @@ export function getNearestAcceptableCamera(
   const qTarget = q0.clone().slerp(q1, t);
   const target = new THREE.Vector3(0, 0, 1).applyQuaternion(qTarget);
 
-  let finalDir = clampPolarAngle(target);
+  let finalDir = puzzleId === 'pyraminx' ? clampPyraminxPolarAngle(target) : clampPolarAngle(target);
   const finalRot = Math.acos(Math.max(-1, Math.min(1, cur.dot(finalDir))));
   if (finalRot > MAX_STEP_ROTATION_RAD) {
     const qCur = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), cur);
     const qFin = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), finalDir);
     const qClamped = qCur.clone().slerp(qFin, (MAX_STEP_ROTATION_RAD * 0.99) / finalRot);
     finalDir = new THREE.Vector3(0, 0, 1).applyQuaternion(qClamped).normalize();
+    if (puzzleId === 'pyraminx') {
+      finalDir = clampPyraminxPolarAngle(finalDir);
+    }
+  }
+
+  if (puzzleId === 'pyraminx') {
+    // Ensure azimuth delta <= 58° from current view
+    const curAz = Math.atan2(cur.x, cur.z);
+    const finAz = Math.atan2(finalDir.x, finalDir.z);
+    let dAz = finAz - curAz;
+    while (dAz > Math.PI) dAz -= 2 * Math.PI;
+    while (dAz < -Math.PI) dAz += 2 * Math.PI;
+    const maxAzDelta = (58 * Math.PI) / 180;
+    if (Math.abs(dAz) > maxAzDelta) {
+      const clampedAz = curAz + Math.sign(dAz) * maxAzDelta;
+      const xzLen = Math.hypot(finalDir.x, finalDir.z);
+      finalDir.x = xzLen * Math.sin(clampedAz);
+      finalDir.z = xzLen * Math.cos(clampedAz);
+    }
   }
 
   return { targetDir: finalDir, changed: true };
@@ -175,6 +220,9 @@ export const CameraRig: React.FC<CameraRigProps> = ({
     clampPolarAngle(new THREE.Vector3(Math.sin(0.6) * Math.cos(0.5), Math.sin(0.5), Math.cos(0.6) * Math.cos(0.5)).normalize())
   );
   const currentDistance = useRef<number>(baseDistance);
+  useEffect(() => {
+    currentDistance.current = baseDistance;
+  }, [baseDistance]);
   const angularVelocity = useRef<number>(0);
 
   // Motion state

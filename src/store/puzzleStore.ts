@@ -28,6 +28,7 @@ interface PuzzleStoreState {
 
   // Solution Player controls
   nextMove: () => void;
+  applyStepPlan?: (plan: any) => void;
   prevMove: () => void;
   goToMove: (index: number) => void;
   togglePlay: () => void;
@@ -264,6 +265,26 @@ export const usePuzzleStore = create<PuzzleStoreState>((set, get) => ({
       });
       return false;
     }
+  },
+
+  applyStepPlan: (plan: any) => {
+    const { solutionMoves, currentState, activePuzzleId } = get();
+    if (!plan || plan.stepIndex >= solutionMoves.length) {
+      set({ isPlaying: false, showSolvedCelebration: true });
+      return;
+    }
+    const puzzle = getPuzzle(activePuzzleId);
+    const nextState = puzzle.applyMove(currentState, plan.emittedMove);
+    hapticFeedback.light();
+
+    const nextIndex = plan.stepIndex + 1;
+    const isLast = nextIndex >= solutionMoves.length;
+    set({
+      currentState: nextState,
+      currentMoveIndex: nextIndex,
+      showSolvedCelebration: isLast,
+      isPlaying: isLast ? false : get().isPlaying,
+    });
   },
 
   nextMove: () => {

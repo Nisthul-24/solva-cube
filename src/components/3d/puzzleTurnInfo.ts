@@ -39,6 +39,7 @@ export interface UnifiedTurnInfo {
   puzzleId: '3x3' | '2x2' | '4x4' | 'pyraminx';
   move: string;
   axis: Vec3;          // Unit vector toward viewer's side of turning layer (outward normal)
+  outwardNormal?: Vec3; // Outward unit normal for camera targeting (+1 for U/R/F, -1 for D/L/B)
   axisPoint: Vec3;     // Center of rotation on axis
   angleRad: number;    // Signed rotation angle about axis
   isDouble: boolean;
@@ -289,6 +290,7 @@ export function getPuzzleTurnInfo(
         puzzleId: '4x4',
         move: clean,
         axis: A,
+        outwardNormal: m.outwardNormal || A,
         axisPoint: arcCenter,
         angleRad,
         isDouble,
