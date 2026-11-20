@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -65,6 +66,17 @@ function SpheresScene() {
 }
 
 export default function ColourCheckScreen() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (typeof __DEV__ !== 'undefined' && !__DEV__) {
+      router.replace('/');
+    }
+  }, [router]);
+
+  if (typeof __DEV__ !== 'undefined' && !__DEV__) {
+    return null;
+  }
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>

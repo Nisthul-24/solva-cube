@@ -25,6 +25,7 @@ interface Pyraminx3DViewProps {
   isGhostPreview?: boolean;
   turnDurationMs?: number;
   autoViewMode?: AutoViewOption;
+  showColorBlindLetters?: boolean;
   isSolved?: boolean;
   interactivePainting?: boolean;
   guidedMode?: boolean;
@@ -52,6 +53,7 @@ export const Pyraminx3DView: React.FC<Pyraminx3DViewProps> = ({
   isGhostPreview = false,
   turnDurationMs = 1400,
   autoViewMode = 'minimal',
+  showColorBlindLetters: propShowColorBlind,
   isSolved = false,
   interactivePainting = false,
   guidedMode = false,
@@ -62,7 +64,10 @@ export const Pyraminx3DView: React.FC<Pyraminx3DViewProps> = ({
   onStickerClick,
   style,
 }) => {
-  const highlightStyle = useSettingsStore((s) => s.highlightStyle);
+  const storeHighlightStyle = useSettingsStore((s) => s.highlightStyle);
+  const highlightStyle = storeHighlightStyle;
+  const storeColorBlind = useSettingsStore((s) => s.showColorBlindLetters);
+  const showColorBlindLetters = propShowColorBlind !== undefined ? propShowColorBlind : storeColorBlind;
   const [azimuth, setAzimuth] = useState(0.4);
   const [elevation, setElevation] = useState(0.3);
   const [movingChip, setMovingChip] = useState<{ text: string; screenX: number; screenY: number; visible: boolean } | null>(null);
@@ -155,7 +160,7 @@ export const Pyraminx3DView: React.FC<Pyraminx3DViewProps> = ({
     [onStickerClick]
   );
 
-  const isDebug = typeof window !== 'undefined' && window.location?.search?.includes('debug=1');
+  const isDebug = Boolean(__DEV__ && typeof window !== 'undefined' && window.location?.search?.includes('debug=1'));
   const isEdgeOn = devInfo ? Math.abs(devInfo.dot) < 0.2 : false;
   const showEdgeOnHint = isEdgeOn && autoViewMode === 'off' && unified && !isSolved;
 
@@ -165,6 +170,8 @@ export const Pyraminx3DView: React.FC<Pyraminx3DViewProps> = ({
         <ThreeCanvas
           style={styles.canvas}
           camera={{ fov: 32 }}
+          frameloop={isAnimating ? 'always' : 'demand'}
+          dpr={[1, 2]}
         >
           <Pyraminx3D
             state={state}
@@ -176,6 +183,7 @@ export const Pyraminx3DView: React.FC<Pyraminx3DViewProps> = ({
             autoViewMode={autoViewMode}
             highlightStyle={highlightStyle}
             guidedMode={guidedMode}
+            showColorBlindLetters={showColorBlindLetters}
             isSolved={isSolved}
             offendingStickers={offendingStickers}
             cameraAzimuth={azimuth}

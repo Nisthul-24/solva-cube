@@ -154,18 +154,33 @@ export const Cube3DView: React.FC<Cube3DViewProps> = ({
     [onStickerClick]
   );
 
-  const isDebug = typeof window !== 'undefined' && window.location?.search?.includes('debug=1');
+  const isDebug = Boolean(__DEV__ && typeof window !== 'undefined' && window.location?.search?.includes('debug=1'));
   const isEdgeOn = devInfo ? Math.abs(devInfo.dot) < 0.2 : false;
   const showEdgeOnHint = isEdgeOn && autoViewMode === 'off' && unified && !isSolved;
 
   return (
     <View style={[styles.container, style]}>
+      {/* Frame 0 Skeleton Cube placeholder behind Canvas for instant readiness */}
+      <View style={styles.skeletonContainer} pointerEvents="none">
+        <View
+          style={[
+            styles.skeletonCube,
+            {
+              width: dimension === 2 ? 140 : 160,
+              height: dimension === 2 ? 140 : 160,
+              borderRadius: dimension === 4 ? 18 : 12,
+            },
+          ]}
+        />
+      </View>
+
       {/* 3D Canvas */}
       <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers}>
         <CanvasErrorBoundary onResetCamera={handleResetView}>
           <ThreeCanvas
             style={styles.canvas}
-            camera={dimension === 4 ? { fov: 45 } : undefined}
+            frameloop={isAnimating ? 'always' : 'demand'}
+            dpr={[1, 2]}
           >
             <PuzzleCube3D
               cubeState={cubeState}
@@ -343,6 +358,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#0b1120',
     overflow: 'hidden',
     position: 'relative',
+  },
+  skeletonContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  skeletonCube: {
+    backgroundColor: 'rgba(30, 41, 59, 0.45)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(56, 189, 248, 0.25)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
   },
   canvas: {
     width: '100%',

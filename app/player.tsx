@@ -6,9 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   useWindowDimensions,
+  Platform,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   SkipBack,
   SkipForward,
@@ -39,7 +42,8 @@ import {
   AutoViewOption,
 } from '../src/store/settingsStore';
 import { UI_COLORS } from '../src/constants/colors';
-import { adService } from '../src/services/adService';
+import { adController } from '../src/ads/adController';
+import { nativeAdAdapter } from '../src/ads/nativeAdAdapter';
 import { hapticFeedback } from '../src/services/hapticsService';
 import { getMoveInstructionInfo } from '../src/components/3d/cubieModel';
 import { wording as getEngineWording, getStandardMoveNotation } from '../src/puzzleEngine/puzzleEngine';
@@ -48,6 +52,7 @@ import { Cube3x3State } from '../src/solvers/cube3x3/cube3x3Facelets';
 import { getFrontMovementHint } from '../src/components/3d/puzzleTurnInfo';
 import { PlaybackController, PlaybackState } from '../src/components/playback/playbackController';
 import { createStepPlan, StepPlan } from '../src/puzzleEngine/stepPlan';
+import { keepAwakeService } from '../src/services/keepAwakeService';
 
 export default function SolutionPlayerScreen() {
   const router = useRouter();
@@ -362,6 +367,29 @@ export default function SolutionPlayerScreen() {
     ? controllerState === 'camera' || controllerState === 'waiting' || controllerState === 'turning'
     : isPlaying;
 
+  // Android BackHandler: navigating back from Player routes to Setup (/input)
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        router.replace('/input');
+        return true;
+      });
+      return () => sub.remove();
+    }
+  }, [router]);
+
+  // Keep screen awake while solution playback is running
+  useEffect(() => {
+    if (isEffectivePlaying) {
+      keepAwakeService.activate();
+    } else {
+      keepAwakeService.deactivate();
+    }
+    return () => {
+      keepAwakeService.deactivate();
+    };
+  }, [isEffectivePlaying]);
+
   const handlePlayPause = useCallback(() => {
     hapticFeedback.light();
     if (isNewPlayback) {
@@ -395,9 +423,9 @@ export default function SolutionPlayerScreen() {
   // Show interstitial once on solved screen if policy allows (3-min gap)
   useEffect(() => {
     if (showSolvedCelebration) {
-      adService.showInterstitialIfAllowed();
+      nativeAdAdapter.showInterstitial(activePuzzleId);
     }
-  }, [showSolvedCelebration]);
+  }, [showSolvedCelebration, activePuzzleId]);
 
   const handleNext = () => {
     if (isSolved) return;
@@ -447,10 +475,58 @@ export default function SolutionPlayerScreen() {
     restartSolution();
   };
 
-  const handleSolveAnother = () => {
+  const handleMadeMistake = () => {
+    runIdRef.current++;
+    setIsGhostPreview(false);
+    hapticFeedback.medium();
+    setIsAnimating(false);
+    setAnimatingMove(null);
+    setAnimatingPlan(null);
+    if (isNewPlayback) {
+      controllerRef.current?.destroy();
+    }
+    // If the puzzle is 4x4, exempt from watching another ad for 10 minutes
+    if (activePuzzleId === '4x4') {
+      useSettingsStore.getState().unlock4x4ForMinutes(10);
+    }
+    // Pre-fill setup screen with current step's logical state
+    usePuzzleStore.getState().setCurrentState(currentState);
+    router.push('/input');
+  };
+
+  // Resume solve persistence: save state & step index when in progress, clear when solved
+  useEffect(() => {
+    if (isSolved || totalMoves === 0) {
+      AsyncStorage.removeItem('@solvacube_resume_solve').catch(() => {});
+    } else if (currentMoveIndex < totalMoves) {
+      const sessionData = {
+        puzzleId: activePuzzleId,
+        state: currentState,
+        solutionMoves,
+        currentMoveIndex,
+        totalMoves,
+        timestamp: Date.now(),
+      };
+      AsyncStorage.setItem('@solvacube_resume_solve', JSON.stringify(sessionData)).catch(() => {});
+    }
+  }, [isSolved, totalMoves, currentMoveIndex, activePuzzleId, currentState, solutionMoves]);
+
+  const handleSolveAnother = async () => {
+    AsyncStorage.removeItem('@solvacube_resume_solve').catch(() => {});
     dismissCelebration();
+    // Interstitial triggered on natural break: "Solve another"
+    await adController.recordCompletedSolve(activePuzzleId);
+    await nativeAdAdapter.showInterstitial(activePuzzleId);
     resetState();
     router.replace('/input');
+  };
+
+  const handleDismissCelebration = async () => {
+    AsyncStorage.removeItem('@solvacube_resume_solve').catch(() => {});
+    dismissCelebration();
+    // Interstitial triggered on natural break: closing Solved dialog
+    await adController.recordCompletedSolve(activePuzzleId);
+    await nativeAdAdapter.showInterstitial(activePuzzleId);
   };
 
   // Move chips list auto scroll
@@ -590,6 +666,7 @@ export default function SolutionPlayerScreen() {
               isGhostPreview={isGhostPreview}
               turnDurationMs={turnDurationMs}
               autoViewMode={autoViewMode}
+              showColorBlindLetters={showColorBlindLetters}
               isSolved={isSolved}
               onAnimationComplete={handleAnimationComplete}
               onCameraMoveComplete={handleCameraMoveComplete}
@@ -844,9 +921,21 @@ export default function SolutionPlayerScreen() {
             <TouchableOpacity
               style={styles.secondaryBtn}
               onPress={handleStartOver}
+              accessibilityRole="button"
+              accessibilityLabel="Start over"
             >
               <RotateCcw size={16} color="#94A3B8" />
               <Text style={styles.secondaryBtnText}>Start over</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.secondaryBtn, { borderColor: '#F59E0B' }]}
+              onPress={handleMadeMistake}
+              accessibilityRole="button"
+              accessibilityLabel="I made a mistake"
+            >
+              <AlertCircle size={16} color="#F59E0B" />
+              <Text style={[styles.secondaryBtnText, { color: '#FBBF24' }]}>I made a mistake</Text>
             </TouchableOpacity>
 
             {/* Debug 4x4 Scramble & Replay Button */}
@@ -872,7 +961,7 @@ export default function SolutionPlayerScreen() {
         <ConfettiOverlay
           movesCount={totalMoves}
           onSolveAnother={handleSolveAnother}
-          onDismiss={dismissCelebration}
+          onDismiss={handleDismissCelebration}
         />
       )}
     </SafeAreaView>
@@ -1272,8 +1361,10 @@ const styles = StyleSheet.create({
   },
   secondaryRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 8,
     paddingTop: 8,
   },
   secondaryBtn: {

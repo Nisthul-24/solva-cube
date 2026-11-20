@@ -8,6 +8,8 @@ import {
   Modal,
   ScrollView,
   useWindowDimensions,
+  Platform,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -24,7 +26,9 @@ import {
   ToggleRight,
   Maximize2,
   Settings,
+  Camera,
 } from 'lucide-react-native';
+import { CameraScannerModal } from '../src/camera/CameraScannerModal';
 import { Header } from '../src/components/Header';
 import { ColorPalette } from '../src/components/ColorPalette';
 import { Cube3DView } from '../src/components/3d/Cube3DView';
@@ -33,8 +37,8 @@ import { NetView3x3 } from '../src/components/NetView3x3';
 import { NetView2x2 } from '../src/components/NetView2x2';
 import { NetViewPyraminx } from '../src/components/NetViewPyraminx';
 import { PuzzleNet } from '../src/components/PuzzleNet';
-import { BannerAdComponent } from '../src/components/BannerAdComponent';
-import { adService } from '../src/services/adService';
+import { adController } from '../src/ads/adController';
+import { nativeAdAdapter } from '../src/ads/nativeAdAdapter';
 import { usePuzzleStore } from '../src/store/puzzleStore';
 import { useSettingsStore } from '../src/store/settingsStore';
 import { UI_COLORS } from '../src/constants/colors';
@@ -156,6 +160,7 @@ export default function ColourInputScreen() {
   const undo = usePuzzleStore((s) => s.undo);
   const resetState = usePuzzleStore((s) => s.resetState);
   const fillSampleScramble = usePuzzleStore((s) => s.fillSampleScramble);
+  const setCurrentState = usePuzzleStore((s) => s.setCurrentState);
   const solveCurrentState = usePuzzleStore((s) => s.solveCurrentState);
 
   const isDarkMode = useSettingsStore((s) => s.isDarkMode);
@@ -178,6 +183,18 @@ export default function ColourInputScreen() {
   const [mode, setMode] = useState<'guided' | 'free'>('guided');
   const [wizardStepIdx, setWizardStepIdx] = useState(0);
   const [showNetOverview, setShowNetOverview] = useState(false);
+  const [showCameraScanner, setShowCameraScanner] = useState(false);
+
+  // Android BackHandler: navigating back from Setup goes to Home screen
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        router.replace('/');
+        return true;
+      });
+      return () => sub.remove();
+    }
+  }, [router]);
 
   const wizardSteps = activePuzzleId === 'pyraminx' ? PYRAMINX_WIZARD_FACES : WIZARD_FACES;
   const currentStep = wizardSteps[wizardStepIdx] || wizardSteps[0];
@@ -253,7 +270,11 @@ export default function ColourInputScreen() {
     hapticFeedback.medium();
 
     if (activePuzzleId === '4x4') {
-      const isUnlocked = adsRemoved || Date.now() < cube4x4UnlockedUntil;
+      const solutionHash = JSON.stringify(currentState);
+      const isUnlocked =
+        adsRemoved ||
+        adController.is4x4SolutionUnlocked(solutionHash) ||
+        cube4x4UnlockedUntil > Date.now();
       if (!isUnlocked) {
         setShowUnlock4x4Modal(true);
         return;
@@ -273,6 +294,12 @@ export default function ColourInputScreen() {
     if (success) {
       router.push('/player');
     }
+  };
+
+  const handleWatchVideoUnlock = async () => {
+    const solutionHash = JSON.stringify(currentState);
+    await nativeAdAdapter.showRewarded4x4(solutionHash);
+    await proceedSolveAfterUnlock();
   };
 
   return (
@@ -351,6 +378,7 @@ export default function ColourInputScreen() {
                 activeFace={activeFace as any}
                 guidedMode={mode === 'guided'}
                 autoViewMode={autoViewMode}
+                showColorBlindLetters={showColorBlindLetters}
                 offendingStickers={solveError?.offendingStickers as any}
                 onStickerClick={handlePaintSticker as any}
                 onAutoViewModeChange={setAutoViewMode}
@@ -388,6 +416,20 @@ export default function ColourInputScreen() {
               <Maximize2 size={11} color="#94A3B8" />
             </View>
           </TouchableOpacity>
+
+          {/* Narrow screen 4x4 helper banner */}
+          {activePuzzleId === '4x4' && width < 380 && (
+            <TouchableOpacity
+              style={styles.narrowScreenNetBanner}
+              onPress={() => setShowNetOverview(true)}
+              accessibilityLabel="Switch to 2D Net for larger touch targets"
+            >
+              <Layers size={13} color="#FFB400" />
+              <Text style={styles.narrowScreenNetText}>
+                Narrow screen: Tap here for 2D Net painting (≥28dp targets)
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Bottom Sheet: Palette, Tools & Solve Button (Requirement 3) */}
@@ -420,20 +462,32 @@ export default function ColourInputScreen() {
             />
           </View>
 
-          {/* Tools Row: Undo, Sample Scramble, Reset */}
+          {/* Tools Row: Undo, Camera Scan, Sample Scramble, Reset */}
           <View style={styles.toolsRow}>
+            {activePuzzleId !== 'pyraminx' && (
+              <TouchableOpacity
+                style={styles.toolBtn}
+                onPress={() => setShowCameraScanner(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Scan with Camera"
+              >
+                <Camera size={14} color="#22d3ee" />
+                <Text style={styles.toolBtnText}>Scan</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity style={styles.toolBtn} onPress={undo} accessibilityRole="button" accessibilityLabel="Undo">
-              <Undo2 size={16} color="#CBD5E1" />
+              <Undo2 size={14} color="#CBD5E1" />
               <Text style={styles.toolBtnText}>Undo</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.toolBtn} onPress={fillSampleScramble} accessibilityRole="button" accessibilityLabel="Sample Scramble">
-              <Dices size={16} color="#22d3ee" />
-              <Text style={styles.toolBtnText}>Sample Scramble</Text>
+              <Dices size={14} color="#22d3ee" />
+              <Text style={styles.toolBtnText}>Sample</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.toolBtn} onPress={resetState} accessibilityRole="button" accessibilityLabel="Reset">
-              <RotateCcw size={16} color="#94A3B8" />
+              <RotateCcw size={14} color="#94A3B8" />
               <Text style={styles.toolBtnText}>Reset</Text>
             </TouchableOpacity>
           </View>
@@ -460,11 +514,6 @@ export default function ColourInputScreen() {
               </>
             )}
           </TouchableOpacity>
-
-          {/* Banner Ad */}
-          <View style={styles.adWrap}>
-            <BannerAdComponent />
-          </View>
         </View>
       </View>
 
@@ -523,7 +572,7 @@ export default function ColourInputScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={styles.modalTitle}>Unlock 4x4 Revenge Cube</Text>
+                <Text style={styles.modalTitle}>Unlock 4x4 Solution</Text>
               </View>
               <TouchableOpacity
                 onPress={() => setShowUnlock4x4Modal(false)}
@@ -534,20 +583,15 @@ export default function ColourInputScreen() {
             </View>
 
             <Text style={{ color: '#94A3B8', fontSize: 13, marginVertical: 12, lineHeight: 18 }}>
-              The 4x4 Revenge Cube solver unlocks for 24 hours by watching a quick rewarded ad, or permanently with Remove Ads.
+              Watch a short video to unlock this 4x4 solution.
             </Text>
 
             <TouchableOpacity
               style={[styles.modalDoneBtn, { backgroundColor: '#38BDF8', marginBottom: 10 }]}
-              onPress={() => {
-                adService.showRewarded(async () => {
-                  unlock4x4For24h();
-                  await proceedSolveAfterUnlock();
-                });
-              }}
+              onPress={handleWatchVideoUnlock}
             >
               <Text style={[styles.modalDoneText, { color: '#0F172A', fontWeight: '800' }]}>
-                Watch Video (24h free)
+                Watch Video
               </Text>
             </TouchableOpacity>
 
@@ -572,6 +616,16 @@ export default function ColourInputScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Guided Camera Scanner Modal */}
+      <CameraScannerModal
+        visible={showCameraScanner}
+        onClose={() => setShowCameraScanner(false)}
+        dimension={activePuzzleId === '4x4' ? 4 : activePuzzleId === '2x2' ? 2 : 3}
+        onScanComplete={(scanned) => {
+          setCurrentState(scanned);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -746,7 +800,7 @@ const styles = StyleSheet.create({
   toolsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 6,
     marginBottom: 10,
   },
   toolBtn: {
@@ -756,10 +810,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#1E293B',
     paddingVertical: 8,
+    paddingHorizontal: 4,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    gap: 6,
+    gap: 4,
   },
   toolBtnText: {
     color: '#CBD5E1',
@@ -885,5 +940,27 @@ const styles = StyleSheet.create({
     color: '#E2E8F0',
     fontSize: 10,
     fontWeight: '600',
+  },
+  narrowScreenNetBanner: {
+    position: 'absolute',
+    top: 8,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(24, 22, 20, 0.92)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 180, 0, 0.4)',
+    zIndex: 20,
+  },
+  narrowScreenNetText: {
+    color: '#FFB400',
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
   },
 });

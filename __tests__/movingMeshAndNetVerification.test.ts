@@ -203,8 +203,10 @@ describe('SolvaCube: Moving Meshes, Glitchless Pyraminx & Clean Net Verification
     test('Intentional mutation check: deliberate arrow offset causes validation test to fail', () => {
       const eng = getPuzzleEngine('4x4');
       const originalMove = eng.getMove('R')!;
+      const originalCenter = [...originalMove.arrowCenter] as Vec3;
 
-      // Mutate arrow center by offset 10 units away
+      // Mutate arrow center by offset 15 units away
+      (originalMove as any).arrowCenter = [originalCenter[0] + 15, originalCenter[1] + 15, originalCenter[2]];
       const mutatedArrowPoints = originalMove.arrow.arcPoints.map(
         (p) => [p[0] + 15, p[1] + 15, p[2]] as Vec3
       );
@@ -215,6 +217,7 @@ describe('SolvaCube: Moving Meshes, Glitchless Pyraminx & Clean Net Verification
       expect(res.distArrow).toBeGreaterThan(res.screenSize * 0.5 + 45);
 
       // Restore
+      (originalMove as any).arrowCenter = originalCenter;
       (originalMove as any).arrow = {
         ...originalMove.arrow,
         arcPoints: originalMove.arrow.arcPoints.map((p) => [p[0] - 15, p[1] - 15, p[2]] as Vec3),

@@ -11,18 +11,20 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0F172A"
+      "backgroundColor": "#181614"
     },
     "android": {
       "package": "com.solvacube.app",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0F172A"
+        "backgroundColor": "#181614"
       },
       "permissions": [
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "CAMERA",
+        "com.google.android.gms.permission.AD_ID"
       ]
     },
     "web": {
@@ -33,10 +35,17 @@
     "plugins": [
       "expo-router",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "SolvaCube uses the camera to scan and recognize your cube's face colors automatically.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "androidAppId": "ca-app-pub-XXXX~YYYY",
+          "iosAppId": "ca-app-pub-XXXX~YYYY",
           "userTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
         }
       ]
@@ -44,6 +53,12 @@
     "extra": {
       "eas": {
         "projectId": "your-eas-project-id"
+      },
+      "adMob": {
+        "androidAppId": "ca-app-pub-XXXX~YYYY",
+        "bannerAdUnitId": "ca-app-pub-XXXX/BBBB",
+        "interstitialAdUnitId": "ca-app-pub-XXXX/IIII",
+        "rewardedAdUnitId": "ca-app-pub-XXXX/RRRR"
       }
     }
   }

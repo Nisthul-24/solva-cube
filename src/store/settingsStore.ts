@@ -72,6 +72,7 @@ interface SettingsState {
   setIsColorBlindMode: (val: boolean) => void;
   setAdsRemoved: (val: boolean) => void;
   unlock4x4For24h: () => void;
+  unlock4x4ForMinutes: (minutes: number) => void;
   setConsentStatus: (val: 'unknown' | 'granted' | 'denied') => void;
   loadSettings: () => Promise<void>;
 }
@@ -134,6 +135,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
   unlock4x4For24h: () => {
     const cube4x4UnlockedUntil = Date.now() + 24 * 60 * 60 * 1000;
+    set({ cube4x4UnlockedUntil });
+    saveSettings(get());
+  },
+  unlock4x4ForMinutes: (minutes: number) => {
+    const current = get().cube4x4UnlockedUntil;
+    const cube4x4UnlockedUntil = Math.max(current, Date.now() + minutes * 60 * 1000);
     set({ cube4x4UnlockedUntil });
     saveSettings(get());
   },

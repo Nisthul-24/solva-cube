@@ -8,6 +8,17 @@ import { FaceName3x3 } from './3d/cubieModel';
 import { getPuzzleEngine } from '../puzzleEngine/puzzleEngine';
 import { PYRAMINX_STICKERS_3D } from '../solvers/pyraminx/pyraminxGeometry';
 import { FaceNamePyraminx } from '../solvers/pyraminx/pyraminxFacelets';
+import { useSettingsStore } from '../store/settingsStore';
+
+export function getColorBlindLetter(color: string): { letter: string; textColor: string } {
+  if (!color) return { letter: '', textColor: '#111111' };
+  const letter = color[0].toUpperCase();
+  const isDark = color === 'white' || color === 'yellow' || color === 'orange' || color === 'green';
+  return {
+    letter,
+    textColor: isDark ? '#111111' : '#FFFFFF',
+  };
+}
 
 export interface PuzzleNetProps {
   puzzleId: PuzzleId;
@@ -18,6 +29,7 @@ export interface PuzzleNetProps {
   stepPlan?: any;
   readOnly?: boolean;
   size?: 'normal' | 'mini';
+  showColorBlindLetters?: boolean;
 }
 
 const FACE_CONFIG_CUBE: Record<
@@ -41,6 +53,7 @@ export function PuzzleNet({
   stepPlan,
   readOnly = true,
   size = 'normal',
+  showColorBlindLetters,
 }: PuzzleNetProps) {
   if (puzzleId === 'pyraminx') {
     return (
@@ -51,6 +64,7 @@ export function PuzzleNet({
         highlightMove={stepPlan?.emittedMove || highlightMove}
         readOnly={readOnly}
         size={size}
+        showColorBlindLetters={showColorBlindLetters}
       />
     );
   }
@@ -67,6 +81,7 @@ export function PuzzleNet({
       stepPlan={stepPlan}
       readOnly={readOnly}
       size={size}
+      showColorBlindLetters={showColorBlindLetters}
     />
   );
 }
@@ -85,6 +100,7 @@ interface CubeSvgNetProps {
   stepPlan?: any;
   readOnly?: boolean;
   size?: 'normal' | 'mini';
+  showColorBlindLetters?: boolean;
 }
 
 function CubeSvgNet({
@@ -96,7 +112,10 @@ function CubeSvgNet({
   highlightMove,
   stepPlan,
   readOnly = true,
+  showColorBlindLetters: propShowLetters,
 }: CubeSvgNetProps) {
+  const storeLetters = useSettingsStore((s) => s.showColorBlindLetters);
+  const showColorBlindLetters = propShowLetters !== undefined ? propShowLetters : storeLetters;
   const n = dimension;
   const cellSize = 22;
   const cellGap = 2;
@@ -219,25 +238,40 @@ function CubeSvgNet({
 
                   const cellX = xGrid + c * (cellSize + cellGap);
                   const cellY = yGrid + r * (cellSize + cellGap);
+                  const { letter, textColor } = getColorBlindLetter(colorName);
 
                   return (
-                    <Rect
-                      key={idx}
-                      x={cellX}
-                      y={cellY}
-                      width={cellSize}
-                      height={cellSize}
-                      rx={2.5}
-                      ry={2.5}
-                      fill={fillColor}
-                      stroke={isSelected ? '#F8FAFC' : isTurning ? '#22d3ee' : 'rgba(0,0,0,0.45)'}
-                      strokeWidth={isSelected ? 3 : isTurning ? 2.5 : 0.8}
-                      onPress={() => {
-                        if (!readOnly && onStickerPress) {
-                          onStickerPress(face, idx);
-                        }
-                      }}
-                    />
+                    <G key={idx}>
+                      <Rect
+                        x={cellX}
+                        y={cellY}
+                        width={cellSize}
+                        height={cellSize}
+                        rx={2.5}
+                        ry={2.5}
+                        fill={fillColor}
+                        stroke={isSelected ? '#F8FAFC' : isTurning ? '#22d3ee' : 'rgba(0,0,0,0.45)'}
+                        strokeWidth={isSelected ? 3 : isTurning ? 2.5 : 0.8}
+                        onPress={() => {
+                          if (!readOnly && onStickerPress) {
+                            onStickerPress(face, idx);
+                          }
+                        }}
+                      />
+                      {showColorBlindLetters && letter ? (
+                        <SvgText
+                          x={cellX + cellSize / 2}
+                          y={cellY + cellSize / 2 + 4.2}
+                          fontSize={12}
+                          fontWeight="bold"
+                          fill={textColor}
+                          textAnchor="middle"
+                          pointerEvents="none"
+                        >
+                          {letter}
+                        </SvgText>
+                      ) : null}
+                    </G>
                   );
                 })
               )}
@@ -260,6 +294,7 @@ interface PyraminxSvgNetProps {
   highlightMove?: string | null;
   readOnly?: boolean;
   size?: 'normal' | 'mini';
+  showColorBlindLetters?: boolean;
 }
 
 function PyraminxSvgNet({
@@ -268,7 +303,10 @@ function PyraminxSvgNet({
   activeFaceIndex,
   highlightMove,
   readOnly = true,
+  showColorBlindLetters: propShowLetters,
 }: PyraminxSvgNetProps) {
+  const storeLetters = useSettingsStore((s) => s.showColorBlindLetters);
+  const showColorBlindLetters = propShowLetters !== undefined ? propShowLetters : storeLetters;
   // Four separate triangular faces with 8px gap between faces (Section 3)
   // Layout: Front face on top; Left, Bottom and Right faces below it in a row
   const W_face = 100;
@@ -434,21 +472,36 @@ function PyraminxSvgNet({
                 const q2 = [cenX + (pts[1][0] - cenX) * shrink, cenY + (pts[1][1] - cenY) * shrink];
                 const q3 = [cenX + (pts[2][0] - cenX) * shrink, cenY + (pts[2][1] - cenY) * shrink];
                 const pointsStr = `${q1[0]},${q1[1]} ${q2[0]},${q2[1]} ${q3[0]},${q3[1]}`;
+                const { letter, textColor } = getColorBlindLetter(rawColor);
 
                 return (
-                  <Polygon
-                    key={idx}
-                    points={pointsStr}
-                    fill={stickerHex}
-                    stroke={isSelected ? '#F8FAFC' : isTurning ? '#22d3ee' : 'rgba(0,0,0,0.45)'}
-                    strokeWidth={isSelected ? 3 : isTurning ? 2.5 : 0.8}
-                    strokeLinejoin="round"
-                    onPress={() => {
-                      if (!readOnly && onStickerPress) {
-                        onStickerPress(id, idx);
-                      }
-                    }}
-                  />
+                  <G key={idx}>
+                    <Polygon
+                      points={pointsStr}
+                      fill={stickerHex}
+                      stroke={isSelected ? '#F8FAFC' : isTurning ? '#22d3ee' : 'rgba(0,0,0,0.45)'}
+                      strokeWidth={isSelected ? 3 : isTurning ? 2.5 : 0.8}
+                      strokeLinejoin="round"
+                      onPress={() => {
+                        if (!readOnly && onStickerPress) {
+                          onStickerPress(id, idx);
+                        }
+                      }}
+                    />
+                    {showColorBlindLetters && letter ? (
+                      <SvgText
+                        x={cenX}
+                        y={cenY + 3.5}
+                        fontSize={10}
+                        fontWeight="bold"
+                        fill={textColor}
+                        textAnchor="middle"
+                        pointerEvents="none"
+                      >
+                        {letter}
+                      </SvgText>
+                    ) : null}
+                  </G>
                 );
               })}
             </G>

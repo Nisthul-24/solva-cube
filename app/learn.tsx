@@ -2,7 +2,20 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Compass, RotateCw, RotateCcw, Box, Check, Palette, Sparkles } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Compass,
+  RotateCw,
+  RotateCcw,
+  Box,
+  Check,
+  Palette,
+  Circle,
+  ListOrdered,
+  Layers,
+  Info,
+} from 'lucide-react-native';
+import Svg, { Rect, Text as SvgText, G } from 'react-native-svg';
 import { usePuzzleStore } from '../src/store/puzzleStore';
 import { useSettingsStore } from '../src/store/settingsStore';
 import { UI_COLORS } from '../src/constants/colors';
@@ -11,10 +24,104 @@ import { PuzzleId } from '../src/types/puzzle';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 
 const PUZZLES: Array<{ id: PuzzleId; label: string }> = [
-  { id: '3x3', label: "3x3 Cube" },
+  { id: '3x3', label: '3x3 Cube' },
   { id: '2x2', label: '2x2 Cube' },
+  { id: '4x4', label: '4x4 Cube' },
   { id: 'pyraminx', label: 'Pyraminx' },
 ];
+
+/**
+ * Visual SVG diagram illustrating the 4 distinct layers per axis on a 4x4 cube:
+ * Outer, Inner, Inner, Outer (both horizontal & vertical).
+ */
+function LayerNumberingDiagram() {
+  const cellSize = 38;
+  const gap = 3;
+  const startX = 64;
+  const startY = 36;
+  const layerLabelsX = ['Outer (L)', 'Inner (l)', 'Inner (r)', 'Outer (R)'];
+  const layerLabelsY = ['Outer (U)', 'Inner (u)', 'Inner (d)', 'Outer (D)'];
+
+  return (
+    <View style={styles.diagramContainer}>
+      <Svg width={290} height={210} viewBox="0 0 290 210">
+        {/* Column Labels (Top) */}
+        {layerLabelsX.map((lbl, colIdx) => {
+          const x = startX + colIdx * (cellSize + gap) + cellSize / 2;
+          const isOuter = colIdx === 0 || colIdx === 3;
+          return (
+            <SvgText
+              key={`col-${colIdx}`}
+              x={x}
+              y={24}
+              fill={isOuter ? '#22D3EE' : '#F59E0B'}
+              fontSize="9"
+              fontWeight="bold"
+              textAnchor="middle"
+            >
+              {lbl}
+            </SvgText>
+          );
+        })}
+
+        {/* 4x4 Sticker Grid */}
+        {Array.from({ length: 4 }).map((_, r) => {
+          const isOuterRow = r === 0 || r === 3;
+          return Array.from({ length: 4 }).map((__, c) => {
+            const isOuterCol = c === 0 || c === 3;
+            const isOuter = isOuterRow || isOuterCol;
+            const x = startX + c * (cellSize + gap);
+            const y = startY + r * (cellSize + gap);
+            return (
+              <G key={`cell-${r}-${c}`}>
+                <Rect
+                  x={x}
+                  y={y}
+                  width={cellSize}
+                  height={cellSize}
+                  rx={4}
+                  fill={isOuter ? '#1E293B' : '#334155'}
+                  stroke={isOuter ? '#38BDF8' : '#F59E0B'}
+                  strokeWidth={1.2}
+                />
+              </G>
+            );
+          });
+        })}
+
+        {/* Row Labels (Right) */}
+        {layerLabelsY.map((lbl, rowIdx) => {
+          const y = startY + rowIdx * (cellSize + gap) + cellSize / 2 + 3;
+          const isOuter = rowIdx === 0 || rowIdx === 3;
+          return (
+            <SvgText
+              key={`row-${rowIdx}`}
+              x={startX + 4 * (cellSize + gap) + 6}
+              y={y}
+              fill={isOuter ? '#22D3EE' : '#F59E0B'}
+              fontSize="9"
+              fontWeight="bold"
+              textAnchor="start"
+            >
+              {lbl}
+            </SvgText>
+          );
+        })}
+      </Svg>
+
+      <View style={styles.legendRow}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendChip, { backgroundColor: '#38BDF8', borderColor: '#22D3EE' }]} />
+          <Text style={styles.legendLabel}>Outer Layers (1 & 4)</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendChip, { backgroundColor: '#F59E0B', borderColor: '#D97706' }]} />
+          <Text style={styles.legendLabel}>Inner Slices (2 & 3)</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 function LearnContent() {
   const router = useRouter();
@@ -116,8 +223,55 @@ function LearnContent() {
             <View style={styles.bulletList}>
               {colorOpposites.map((item, idx) => (
                 <View key={idx} style={styles.bulletItem}>
-                  <Sparkles color="#F59E0B" size={14} />
+                  <Circle color="#F59E0B" fill="#F59E0B" size={8} />
                   <Text style={[styles.bulletText, { color: theme.text }]}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* 4x4 Layer Numbering Diagram Card */}
+        {selectedPuzzle === '4x4' && (
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View style={styles.cardHeader}>
+              <Layers color="#22D3EE" size={22} />
+              <Text style={[styles.cardTitle, { color: theme.text }]}>Layer Numbering</Text>
+            </View>
+            <Text style={[styles.paragraph, { color: theme.textSecondary }]}>
+              Each axis has 4 layers: outer, inner, inner, outer. Outer moves turn a single outer face, inner slices turn an internal slice (r / 2R), and wide moves (Rw) turn both outer and inner together:
+            </Text>
+            <LayerNumberingDiagram />
+          </View>
+        )}
+
+        {/* 4-Step Solution Overview Card */}
+        {content?.solutionSteps && (
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View style={styles.cardHeader}>
+              <ListOrdered color="#22D3EE" size={22} />
+              <Text style={[styles.cardTitle, { color: theme.text }]}>4-Step Solving Overview</Text>
+            </View>
+            <Text style={[styles.paragraph, { color: theme.textSecondary }]}>
+              The 4x4 is solved using the Reduction Method in 4 distinct phases:
+            </Text>
+
+            <View style={styles.stepsList}>
+              {content.solutionSteps.map((step) => (
+                <View key={step.number} style={styles.stepRow}>
+                  <View style={[styles.stepNumBadge, { backgroundColor: theme.primary + '20', borderColor: theme.primary }]}>
+                    <Text style={[styles.stepNumText, { color: theme.primary }]}>{step.number}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.stepTitle, { color: theme.text }]}>{step.title}</Text>
+                    <Text style={[styles.stepDesc, { color: theme.textSecondary }]}>{step.desc}</Text>
+                    {step.detail && (
+                      <View style={styles.parityCallout}>
+                        <Info color="#F59E0B" size={13} style={{ marginTop: 2 }} />
+                        <Text style={styles.parityCalloutText}>{step.detail}</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
               ))}
             </View>
@@ -315,5 +469,85 @@ const styles = StyleSheet.create({
   tipDesc: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  diagramContainer: {
+    alignItems: 'center',
+    marginVertical: 10,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  legendRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 10,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendChip: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    borderWidth: 1,
+  },
+  legendLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+  },
+  stepsList: {
+    gap: 12,
+    marginTop: 4,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  stepNumBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  stepNumText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  stepTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  stepDesc: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  parityCallout: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: 6,
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+  },
+  parityCalloutText: {
+    flex: 1,
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: '#FCD34D',
   },
 });

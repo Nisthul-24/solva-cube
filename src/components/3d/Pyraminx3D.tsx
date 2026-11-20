@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { PyraminxState, FaceNamePyraminx, PyraminxColor } from '../../solvers/pyraminx/pyraminxFacelets';
 import {
   PYRAMINX_VERTICES,
+  PYRAMINX_FACES,
   Vec3,
   dot,
   norm,
@@ -21,6 +22,7 @@ import { AutoViewOption, HighlightStyleOption } from '../../store/settingsStore'
 import { TurnArrowRibbon3D } from './TurnArrowRibbon3D';
 import { CameraRig } from './CameraRig';
 import { getPuzzleTurnInfo } from './puzzleTurnInfo';
+import { getLetterMaterial } from './PuzzleCube3D';
 
 export interface OffendingStickerProp {
   face: FaceNamePyraminx;
@@ -37,6 +39,7 @@ export interface Pyraminx3DProps {
   autoViewMode?: AutoViewOption;
   highlightStyle?: HighlightStyleOption;
   guidedMode?: boolean;
+  showColorBlindLetters?: boolean;
   isSolved?: boolean;
   staticProgress?: number;
   offendingStickers?: OffendingStickerProp[];
@@ -74,6 +77,7 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
   autoViewMode = 'minimal',
   highlightStyle = 'glass_belt',
   guidedMode = false,
+  showColorBlindLetters = false,
   isSolved = false,
   staticProgress,
   offendingStickers = [],
@@ -108,6 +112,25 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
         geom.setAttribute('position', new THREE.BufferAttribute(st.positions, 3));
         geom.computeVertexNormals();
 
+        // Calculate incentre letter position & upright rotation towards apex
+        const apex = PYRAMINX_FACES.find((f) => f.id === st.face)?.A || [0, Math.sqrt(3), 0];
+        const normalVec = new THREE.Vector3(...st.normal).normalize();
+        const toApex = new THREE.Vector3(...apex).sub(new THREE.Vector3(...st.centroid));
+        let upVec = toApex.clone().sub(normalVec.clone().multiplyScalar(toApex.dot(normalVec)));
+        if (upVec.lengthSq() < 1e-4) {
+          upVec = new THREE.Vector3(0, 1, 0);
+        } else {
+          upVec.normalize();
+        }
+        const rightVec = new THREE.Vector3().crossVectors(upVec, normalVec).normalize();
+        const basis = new THREE.Matrix4().makeBasis(rightVec, upVec, normalVec);
+        const rotEuler = new THREE.Euler().setFromRotationMatrix(basis);
+        const letterPos: [number, number, number] = [
+          st.centroid[0] + normalVec.x * 0.035,
+          st.centroid[1] + normalVec.y * 0.035,
+          st.centroid[2] + normalVec.z * 0.035,
+        ];
+
         return {
           id: st.id,
           face: st.face,
@@ -116,6 +139,8 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
           centroid: st.centroid,
           normal: st.normal,
           geometry: geom,
+          letterPos,
+          rotEuler,
         };
       });
 
@@ -129,6 +154,8 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
       };
     });
   }, []);
+
+  const letterQuadGeometry = useMemo(() => new THREE.PlaneGeometry(0.36, 0.36), []);
 
   // Set of piece IDs turning in current move (single source of truth from puzzleEngine)
   const { turningPieceIds, turnAxis, turnAngleRad } = useMemo(() => {
@@ -304,8 +331,8 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
     [state, isSolved, currentMoveNotation]
   );
 
-  // Debug overlay data under ?debug=1 (Part C item 2)
-  const isDebug = typeof window !== 'undefined' && window.location?.search?.includes('debug=1');
+  // Debug overlay data under ?debug=1 (Part C item 2) - development mode only
+  const isDebug = Boolean(__DEV__ && typeof window !== 'undefined' && window.location?.search?.includes('debug=1'));
   const debugOverlayData = useMemo(() => {
     if (!isDebug || !currentMoveNotation || isSolved) return null;
     const eng = getPuzzleEngine('pyraminx');
@@ -409,24 +436,35 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
             {/* Child Stickers */}
             {piece.stickers.map((st) => {
               const offending = isOffendingSticker(st.face, st.index);
+              const rawColor = state[st.face]?.[st.index] || (st.face === 'F' ? 'green' : st.face === 'L' ? 'blue' : st.face === 'R' ? 'red' : 'yellow');
+              const letterMat = showColorBlindLetters ? getLetterMaterial(rawColor) : null;
               return (
-                <mesh
-                  key={st.id}
-                  geometry={st.geometry}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onStickerTap?.(st.face, st.index);
-                  }}
-                >
-                  <meshStandardMaterial
-                    color={getStickerColor(st.face, st.index, false)}
-                    roughness={0.25}
-                    metalness={0.05}
-                    side={THREE.DoubleSide}
-                    emissive={offending ? '#ef4444' : '#000000'}
-                    emissiveIntensity={offending ? 0.75 : 0}
-                  />
-                </mesh>
+                <group key={st.id}>
+                  <mesh
+                    geometry={st.geometry}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onStickerTap?.(st.face, st.index);
+                    }}
+                  >
+                    <meshStandardMaterial
+                      color={getStickerColor(st.face, st.index, false)}
+                      roughness={0.25}
+                      metalness={0.05}
+                      side={THREE.DoubleSide}
+                      emissive={offending ? '#ef4444' : '#000000'}
+                      emissiveIntensity={offending ? 0.75 : 0}
+                    />
+                  </mesh>
+                  {showColorBlindLetters && letterMat && (
+                    <mesh
+                      geometry={letterQuadGeometry}
+                      material={letterMat}
+                      position={st.letterPos}
+                      rotation={st.rotEuler}
+                    />
+                  )}
+                </group>
               );
             })}
           </group>
@@ -456,24 +494,35 @@ export const Pyraminx3D: React.FC<Pyraminx3DProps> = ({
               {/* Child Stickers */}
               {piece.stickers.map((st) => {
                 const offending = isOffendingSticker(st.face, st.index);
+                const rawColor = state[st.face]?.[st.index] || (st.face === 'F' ? 'green' : st.face === 'L' ? 'blue' : st.face === 'R' ? 'red' : 'yellow');
+                const letterMat = showColorBlindLetters ? getLetterMaterial(rawColor) : null;
                 return (
-                  <mesh
-                    key={st.id}
-                    geometry={st.geometry}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onStickerTap?.(st.face, st.index);
-                    }}
-                  >
-                    <meshStandardMaterial
-                      color={getStickerColor(st.face, st.index, true)}
-                      roughness={0.35}
-                      metalness={0.05}
-                      side={THREE.DoubleSide}
-                      emissive={offending ? '#ef4444' : '#000000'}
-                      emissiveIntensity={offending ? 0.75 : 0}
-                    />
-                  </mesh>
+                  <group key={st.id}>
+                    <mesh
+                      geometry={st.geometry}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onStickerTap?.(st.face, st.index);
+                      }}
+                    >
+                      <meshStandardMaterial
+                        color={getStickerColor(st.face, st.index, true)}
+                        roughness={0.35}
+                        metalness={0.05}
+                        side={THREE.DoubleSide}
+                        emissive={offending ? '#ef4444' : '#000000'}
+                        emissiveIntensity={offending ? 0.75 : 0}
+                      />
+                    </mesh>
+                    {showColorBlindLetters && letterMat && (
+                      <mesh
+                        geometry={letterQuadGeometry}
+                        material={letterMat}
+                        position={st.letterPos}
+                        rotation={st.rotEuler}
+                      />
+                    )}
+                  </group>
                 );
               })}
             </group>

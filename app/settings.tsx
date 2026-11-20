@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Switch,
   Linking,
   Alert,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,8 +21,12 @@ import {
   Eye,
   Shield,
   FileText,
-  Sparkles,
+  Highlighter,
+  Sun,
   Type,
+  Code2,
+  X,
+  RotateCcw,
 } from 'lucide-react-native';
 import {
   useSettingsStore,
@@ -32,7 +37,9 @@ import {
 } from '../src/store/settingsStore';
 import { UI_COLORS } from '../src/constants/colors';
 import { adService } from '../src/services/adService';
+import { adController } from '../src/ads/adController';
 import { hapticFeedback } from '../src/services/hapticsService';
+import { OPEN_SOURCE_LICENSES } from '../src/constants/licensesData';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -55,6 +62,9 @@ export default function SettingsScreen() {
   const setHighlightStyle = useSettingsStore((s) => s.setHighlightStyle);
   const setShowColorBlindLetters = useSettingsStore((s) => s.setShowColorBlindLetters);
   const setIsColorBlindMode = useSettingsStore((s) => s.setIsColorBlindMode);
+
+  const [showLicensesModal, setShowLicensesModal] = useState(false);
+  const [devSimulation, setDevSimulation] = useState(adController.getState().devSimulationMode);
 
   const theme = isDarkMode ? UI_COLORS.dark : UI_COLORS.light;
 
@@ -194,7 +204,7 @@ export default function SettingsScreen() {
           <View style={styles.optionColumn}>
             <View style={styles.optionHeaderRow}>
               <View style={styles.iconTitleRow}>
-                <Sparkles color={theme.primary} size={20} />
+                <Highlighter color={theme.primary} size={20} />
                 <Text style={[styles.rowLabel, { color: theme.text }]}>Highlight Style</Text>
               </View>
               <Text style={[styles.optionValueText, { color: theme.primary }]}>
@@ -239,7 +249,7 @@ export default function SettingsScreen() {
           <View style={styles.optionColumn}>
             <View style={styles.optionHeaderRow}>
               <View style={styles.iconTitleRow}>
-                <Sparkles color={theme.primary} size={20} />
+                <Sun color={theme.primary} size={20} />
                 <Text style={[styles.rowLabel, { color: theme.text }]}>Highlight Strength</Text>
               </View>
               <Text style={[styles.optionValueText, { color: theme.primary }]}>
@@ -383,7 +393,71 @@ export default function SettingsScreen() {
               <Text style={[styles.rowLabel, { color: theme.text }]}>Privacy Policy</Text>
             </View>
           </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => setShowLicensesModal(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Open-source licences"
+          >
+            <View style={styles.iconTitleRow}>
+              <Code2 color={theme.primary} size={20} />
+              <View>
+                <Text style={[styles.rowLabel, { color: theme.text }]}>Open-source licences</Text>
+                <Text style={[styles.rowDesc, { color: theme.textSecondary }]}>
+                  View third-party software notices
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
+
+        {/* DEVELOPER OPTIONS (Only visible in development mode) */}
+        {typeof __DEV__ !== 'undefined' && __DEV__ && (
+          <>
+            <Text style={[styles.sectionHeading, { color: theme.textSecondary }]}>DEVELOPER OPTIONS</Text>
+            <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={styles.row}>
+                <View style={styles.iconTitleRow}>
+                  <Code2 color={theme.primary} size={20} />
+                  <View>
+                    <Text style={[styles.rowLabel, { color: theme.text }]}>Simulate Ads</Text>
+                    <Text style={[styles.rowDesc, { color: theme.textSecondary }]}>
+                      Test rewarded & interstitial flows without Play Services
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={devSimulation}
+                  onValueChange={async (val) => {
+                    setDevSimulation(val);
+                    await adController.setDevSimulationMode(val);
+                  }}
+                  trackColor={{ false: theme.border, true: theme.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+
+              <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+              <TouchableOpacity
+                style={styles.row}
+                onPress={async () => {
+                  await adController.resetState();
+                  await adController.initialize();
+                  Alert.alert('Reset Complete', 'Ad counters and cooldown timers have been reset.');
+                }}
+              >
+                <View style={styles.iconTitleRow}>
+                  <RotateCcw color="#EF4444" size={20} />
+                  <Text style={[styles.rowLabel, { color: '#EF4444' }]}>Reset Ad Timers & Counters</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
         {/* App Version Info */}
         <View style={styles.versionContainer}>
@@ -392,6 +466,44 @@ export default function SettingsScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Open-Source Licences Modal */}
+      <Modal
+        visible={showLicensesModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowLicensesModal(false)}
+      >
+        <SafeAreaView style={[styles.modalBackdrop, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
+          <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Open-Source Licences</Text>
+              <TouchableOpacity
+                onPress={() => setShowLicensesModal(false)}
+                style={styles.closeBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <X color={theme.text} size={22} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={true}>
+              {OPEN_SOURCE_LICENSES.map((pkg) => (
+                <View key={pkg.name} style={[styles.licenseItem, { borderBottomColor: theme.border }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={[styles.pkgName, { color: theme.text }]}>{pkg.name}</Text>
+                    <View style={styles.licenseBadge}>
+                      <Text style={styles.licenseBadgeText}>{pkg.license}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.pkgVersion, { color: theme.textSecondary }]}>v{pkg.version}</Text>
+                  <Text style={[styles.pkgAuthor, { color: theme.textSecondary }]}>{pkg.author}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -496,5 +608,60 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxHeight: '80%',
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  licenseItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  pkgName: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  licenseBadge: {
+    backgroundColor: 'rgba(255, 180, 0, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  licenseBadgeText: {
+    color: '#FFB400',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  pkgVersion: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  pkgAuthor: {
+    fontSize: 11,
+    marginTop: 2,
   },
 });

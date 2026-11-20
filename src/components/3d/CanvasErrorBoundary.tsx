@@ -1,10 +1,11 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { RotateCcw, AlertTriangle } from 'lucide-react-native';
+import { RotateCcw, AlertTriangle, Layers } from 'lucide-react-native';
 
 interface Props {
   children: ReactNode;
   onResetCamera?: () => void;
+  onSwitchToNet?: () => void;
 }
 
 interface State {
@@ -36,20 +37,35 @@ export class CanvasErrorBoundary extends Component<Props, State> {
       return (
         <View style={styles.fallbackContainer}>
           <AlertTriangle size={36} color="#22d3ee" style={styles.icon} />
-          <Text style={styles.title}>Couldn't update the view</Text>
+          <Text style={styles.title}>Couldn't update 3D view</Text>
           <Text style={styles.subtitle}>
-            An unexpected 3D rendering issue occurred.
+            A 3D rendering or GL context error occurred.
           </Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={this.handleRetry}
-            accessibilityRole="button"
-            accessibilityLabel="Retry view"
-            activeOpacity={0.8}
-          >
-            <RotateCcw size={16} color="#0B1120" />
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={this.handleRetry}
+              accessibilityRole="button"
+              accessibilityLabel="Retry 3D view"
+              activeOpacity={0.8}
+            >
+              <RotateCcw size={16} color="#0B1120" />
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+
+            {this.props.onSwitchToNet && (
+              <TouchableOpacity
+                style={styles.netButton}
+                onPress={this.props.onSwitchToNet}
+                accessibilityRole="button"
+                accessibilityLabel="Switch to 2D Net View"
+                activeOpacity={0.8}
+              >
+                <Layers size={16} color="#FFB400" />
+                <Text style={styles.netButtonText}>2D Net View</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       );
     }
@@ -63,7 +79,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
-    backgroundColor: '#0B1120',
+    backgroundColor: '#181614',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -84,6 +100,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 18,
   },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -97,6 +118,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#0B1120',
+  },
+  netButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#221F1B',
+    borderWidth: 1,
+    borderColor: '#3A352E',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  netButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFB400',
   },
 });
 

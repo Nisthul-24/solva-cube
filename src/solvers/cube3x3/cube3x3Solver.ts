@@ -41,7 +41,7 @@ const ALL_MOVES_3X3 = [
 
 export class Cube3x3Solver implements Puzzle<Cube3x3State> {
   readonly id = '3x3' as const;
-  readonly name = "3x3 Rubik's Cube";
+  readonly name = '3x3 Cube';
   readonly colors = COLORS_3X3;
 
   getFaces(): FaceLayout[] {

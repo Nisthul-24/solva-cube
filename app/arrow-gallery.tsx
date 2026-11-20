@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -84,6 +84,14 @@ export default function ArrowGalleryScreen() {
   const [activePlayMove, setActivePlayMove] = useState<string | null>(null);
   const [subGroup, setSubGroup] = useState<string>('R');
 
+  const isProd = typeof __DEV__ !== 'undefined' && !__DEV__;
+
+  useEffect(() => {
+    if (isProd) {
+      router.replace('/');
+    }
+  }, [router, isProd]);
+
   // Available sub-groups per puzzle to prevent browser WebGL context exhaustion (max 8-16)
   const subGroups = selectedPuzzle === '3x3'
     ? ['R', 'L', 'U', 'D', 'F', 'B']
@@ -126,6 +134,10 @@ export default function ArrowGalleryScreen() {
     5.25 * Math.sin(pyraCam.el),
     5.25 * Math.cos(pyraCam.el) * Math.cos(pyraCam.az),
   ];
+
+  if (isProd) {
+    return null;
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>

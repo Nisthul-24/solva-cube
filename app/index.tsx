@@ -1,87 +1,144 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Platform,
+  BackHandler,
+  ToastAndroid,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Box, Layers, Triangle, Sparkles, ChevronRight, BookOpen, Grid } from 'lucide-react-native';
-import { Header } from '../src/components/Header';
-import { BannerAdComponent } from '../src/components/BannerAdComponent';
+import { useRouter, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ChevronRight, PlayCircle, X } from 'lucide-react-native';
+import { HomeHeader } from '../src/components/home/HomeHeader';
+import { HomePuzzleRow, HomePuzzleItem } from '../src/components/home/HomePuzzleRow';
+import { BannerAdView } from '../src/ads/BannerAdView';
 import { usePuzzleStore } from '../src/store/puzzleStore';
-import { useSettingsStore } from '../src/store/settingsStore';
-import { UI_COLORS } from '../src/constants/colors';
 import { PuzzleId } from '../src/types/puzzle';
 import { hapticFeedback } from '../src/services/hapticsService';
-import { adService } from '../src/services/adService';
 import { getPuzzle } from '../src/solvers';
+import { HOME_THEME } from '../src/constants/homeTheme';
 
-interface PuzzleOption {
-  id: PuzzleId;
-  name: string;
-  badge: string;
-  description: string;
-  icon: typeof Box;
-  color: string;
-}
-
-const PUZZLES: PuzzleOption[] = [
+const PUZZLES: HomePuzzleItem[] = [
   {
     id: '3x3',
-    name: "3x3 Rubik's Cube",
-    badge: 'Popular',
-    description: 'The classic twisty puzzle solved step-by-step with optimal moves.',
-    icon: Box,
-    color: '#0284C7',
+    name: '3x3 Cube',
+    description: 'The classic. About 20 moves from any scramble.',
+    meaningfulLabel: 'Most popular',
+    labelColor: HOME_THEME.primary,
   },
   {
     id: '2x2',
     name: '2x2 Pocket Cube',
-    badge: 'Fast',
-    description: 'Corner-only mini cube solved in intuitive, beginner-friendly stages.',
-    icon: Layers,
-    color: '#10B981',
+    description: 'Small and quick. A good place to start.',
   },
   {
     id: '4x4',
     name: '4x4 Revenge Cube',
-    badge: 'Pro',
-    description: 'Master the 4x4: reduction to centres and paired edges, 3x3 stage and parity fixes.',
-    icon: Grid,
-    color: '#8B5CF6',
+    description: 'Bigger and trickier. We solve it in stages.',
+    meaningfulLabel: 'Advanced',
+    labelColor: HOME_THEME.textMuted,
   },
   {
     id: 'pyraminx',
     name: 'Pyraminx',
-    badge: 'Pyramid',
-    description: 'Regular tetrahedron solved via tips, centres, and edge cycles.',
-    icon: Triangle,
-    color: '#F59E0B',
+    description: 'The triangle puzzle. Easier than it looks.',
   },
 ];
 
 export default function HomeScreen() {
   const router = useRouter();
   const setActivePuzzle = usePuzzleStore((s) => s.setActivePuzzle);
-  const isDarkMode = useSettingsStore((s) => s.isDarkMode);
-  const adsRemoved = useSettingsStore((s) => s.adsRemoved);
-  const cube4x4UnlockedUntil = useSettingsStore((s) => s.cube4x4UnlockedUntil);
-  const unlock4x4For24h = useSettingsStore((s) => s.unlock4x4For24h);
-  const setAdsRemoved = useSettingsStore((s) => s.setAdsRemoved);
-  const theme = isDarkMode ? UI_COLORS.dark : UI_COLORS.light;
 
+  const [isScrolled, setIsScrolled] = useState(false);
   const [loadError, setLoadError] = useState<{ id: string; name: string } | null>(null);
+  const [resumeSession, setResumeSession] = useState<{
+    puzzleId: PuzzleId;
+    state: any;
+    solutionMoves: any[];
+    currentMoveIndex: number;
+    totalMoves: number;
+  } | null>(null);
+
+  const checkResumeSession = useCallback(async () => {
+    try {
+      const raw = await AsyncStorage.getItem('@solvacube_resume_solve');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          parsed &&
+          parsed.puzzleId &&
+          parsed.solutionMoves &&
+          parsed.solutionMoves.length > 0 &&
+          parsed.currentMoveIndex < parsed.solutionMoves.length
+        ) {
+          const puzzle = getPuzzle(parsed.puzzleId);
+          if (puzzle && !puzzle.isSolved(parsed.state)) {
+            setResumeSession(parsed);
+            return;
+          }
+        }
+      }
+      setResumeSession(null);
+    } catch {
+      setResumeSession(null);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      checkResumeSession();
+    }, [checkResumeSession])
+  );
+
+  // Android BackHandler: double-tap back to exit on Home screen
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      let backPressCount = 0;
+      let timer: any = null;
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (backPressCount === 0) {
+          backPressCount++;
+          ToastAndroid.show('Press back again to exit', ToastAndroid.SHORT);
+          timer = setTimeout(() => {
+            backPressCount = 0;
+          }, 2000);
+          return true;
+        } else {
+          clearTimeout(timer);
+          BackHandler.exitApp();
+          return true;
+        }
+      });
+      return () => {
+        clearTimeout(timer);
+        sub.remove();
+      };
+    }
+  }, []);
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    setIsScrolled(offsetY > 4);
+  };
 
   const handleSelectPuzzle = async (id: PuzzleId) => {
     hapticFeedback.light();
     setLoadError(null);
 
     try {
-      // Verify puzzle plugin exists and loads
       const plugin = getPuzzle(id);
       if (!plugin) {
         throw new Error(`Plugin not found for ${id}`);
       }
       await setActivePuzzle(id);
       router.push('/input');
-    } catch (err) {
+    } catch {
       const pInfo = PUZZLES.find((p) => p.id === id);
       setLoadError({
         id,
@@ -90,101 +147,128 @@ export default function HomeScreen() {
     }
   };
 
-  return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg }]} edges={['top', 'left', 'right']}>
-      <Header subtitle="Instant Puzzle Solver" />
+  const handleResumePress = () => {
+    if (!resumeSession) return;
+    hapticFeedback.light();
+    usePuzzleStore
+      .getState()
+      .restoreSolutionSession(
+        resumeSession.puzzleId,
+        resumeSession.state,
+        resumeSession.solutionMoves,
+        resumeSession.currentMoveIndex
+      );
+    router.push('/player');
+  };
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Hero Section */}
-        <View style={[styles.heroCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <View style={styles.heroTextCol}>
-            <View style={styles.heroBadge}>
-              <Sparkles color="#38BDF8" size={14} />
-              <Text style={styles.heroBadgeText}>Animated 3D/2D Solutions</Text>
-            </View>
-            <Text style={[styles.heroTitle, { color: theme.text }]}>Solve any twisty puzzle in minutes</Text>
-            <Text style={[styles.heroDesc, { color: theme.textSecondary }]}>
-              Enter your physical cube's colours, and SolvaCube guides you with step-by-step plain-English moves.
+  const handleDismissResume = async () => {
+    hapticFeedback.light();
+    setResumeSession(null);
+    try {
+      await AsyncStorage.removeItem('@solvacube_resume_solve');
+    } catch {}
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      {/* Header stays fixed; content scrolls beneath it with solid opaque background */}
+      <HomeHeader scrolled={isScrolled} />
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.container}>
+          {/* Intro Section */}
+          <View style={styles.introSection}>
+            <Text style={styles.screenTitle}>What are you solving?</Text>
+            <Text style={styles.screenSubtitle}>
+              Pick your puzzle, copy its colours, and we&apos;ll show you each move.
             </Text>
           </View>
-        </View>
 
-        {/* Error Dialog / Banner if puzzle failed to load */}
-        {loadError && (
-          <View style={styles.errorBanner}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.errorTitle}>The {loadError.name} could not be opened</Text>
-              <Text style={styles.errorSubtitle}>Please check your connection or retry.</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={() => handleSelectPuzzle(loadError.id as PuzzleId)}
-            >
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Puzzle Selection */}
-        <Text style={[styles.sectionHeading, { color: theme.textSecondary }]}>CHOOSE YOUR PUZZLE</Text>
-
-        <View style={styles.puzzleList}>
-          {PUZZLES.map((p) => {
-            const Icon = p.icon;
-            return (
+          {/* Error Banner if a puzzle fails to open */}
+          {loadError && (
+            <View style={styles.errorBanner}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.errorTitle}>The {loadError.name} could not be opened</Text>
+                <Text style={styles.errorSubtitle}>Please check your installation and retry.</Text>
+              </View>
               <TouchableOpacity
-                key={p.id}
-                style={[styles.puzzleCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-                onPress={() => handleSelectPuzzle(p.id)}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={`Select ${p.name}`}
+                style={styles.retryButton}
+                onPress={() => handleSelectPuzzle(loadError.id as PuzzleId)}
               >
-                <View style={[styles.puzzleIconBox, { backgroundColor: p.color + '20' }]}>
-                  <Icon color={p.color} size={32} strokeWidth={2.2} />
-                </View>
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-                <View style={styles.puzzleInfo}>
-                  <View style={styles.titleRow}>
-                    <Text style={[styles.puzzleName, { color: theme.text }]}>{p.name}</Text>
-                    <View style={[styles.puzzleBadge, { backgroundColor: p.color + '20' }]}>
-                      <Text style={[styles.puzzleBadgeText, { color: p.color }]}>{p.badge}</Text>
-                    </View>
-                  </View>
-                  <Text style={[styles.puzzleDesc, { color: theme.textSecondary }]}>
-                    {p.description}
+          {/* Resume Solve Card */}
+          {resumeSession && (
+            <View style={styles.resumeCard}>
+              <TouchableOpacity
+                style={styles.resumeCardContent}
+                onPress={handleResumePress}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Continue your ${getPuzzle(resumeSession.puzzleId)?.name || resumeSession.puzzleId} solve, step ${resumeSession.currentMoveIndex + 1} of ${resumeSession.totalMoves}`}
+              >
+                <View style={styles.resumeIconWrap}>
+                  <PlayCircle color={HOME_THEME.primary} size={24} />
+                </View>
+                <View style={styles.resumeTextWrap}>
+                  <Text style={styles.resumeTitle}>
+                    Continue your {getPuzzle(resumeSession.puzzleId)?.name || resumeSession.puzzleId} solve
+                  </Text>
+                  <Text style={styles.resumeSubtitle}>
+                    Step {resumeSession.currentMoveIndex + 1} of {resumeSession.totalMoves} • {resumeSession.totalMoves - resumeSession.currentMoveIndex} moves left
                   </Text>
                 </View>
-
-                <ChevronRight color={theme.textSecondary} size={22} />
               </TouchableOpacity>
-            );
-          })}
-        </View>
+              <TouchableOpacity
+                style={styles.resumeDismissBtn}
+                onPress={handleDismissResume}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss continue solve"
+              >
+                <X color={HOME_THEME.textMuted} size={18} />
+              </TouchableOpacity>
+            </View>
+          )}
 
-        {/* How to use link card */}
-        <TouchableOpacity
-          style={[styles.howToCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
-          onPress={() => router.push('/learn')}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Learn how to hold the cube and read notation"
-        >
-          <View style={[styles.howToIconBox, { backgroundColor: theme.primary + '20' }]}>
-            <BookOpen color={theme.primary} size={22} />
+          {/* 4 Puzzle Rows */}
+          <View style={styles.puzzleList}>
+            {PUZZLES.map((puzzle) => (
+              <HomePuzzleRow
+                key={puzzle.id}
+                puzzle={puzzle}
+                onPress={handleSelectPuzzle}
+              />
+            ))}
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.howToTitle, { color: theme.text }]}>New to twisty puzzles?</Text>
-            <Text style={[styles.howToSubtitle, { color: theme.textSecondary }]}>
-              Learn standard move notation (R, U', F2) and how to hold your cube.
+
+          {/* Learn Row: Quiet text link at the bottom of the list */}
+          <TouchableOpacity
+            style={styles.learnRow}
+            onPress={() => router.push('/learn')}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="New to cubes? Learn how to hold one and read moves"
+          >
+            <Text style={styles.learnText}>
+              New to cubes? Learn how to hold one and read moves
             </Text>
-          </View>
-          <ChevronRight color={theme.textSecondary} size={20} />
-        </TouchableOpacity>
+            <ChevronRight color={HOME_THEME.textMuted} size={18} strokeWidth={2} />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
-      {/* Banner Ad positioned safely at bottom */}
-      <BannerAdComponent />
+      {/* Banner Ad anchored to bottom outside scrolling area (8 dp spacing, collapse to 0 on error) */}
+      <BannerAdView />
     </SafeAreaView>
   );
 }
@@ -192,152 +276,142 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: HOME_THEME.bg,
+  },
+  scrollView: {
+    flex: 1,
+    backgroundColor: HOME_THEME.bg,
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 24,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24, // 24px bottom padding clears ad banner
+    alignItems: 'center',
   },
-  heroCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 20,
-    marginBottom: 24,
+  container: {
+    width: '100%',
+    maxWidth: 640, // Centered column on desktop & tablet
   },
-  heroTextCol: {
-    gap: 8,
+  introSection: {
+    marginBottom: 20,
+    gap: 6,
   },
-  heroBadge: {
+  screenTitle: {
+    fontSize: 30,
+    fontWeight: '600',
+    color: HOME_THEME.text,
+    letterSpacing: -0.5,
+    fontFamily: Platform.select({
+      web: "'DM Sans', 'Nunito', system-ui, -apple-system, sans-serif",
+      default: undefined,
+    }),
+  },
+  screenSubtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: HOME_THEME.textMuted,
+    fontFamily: Platform.select({
+      web: "'DM Sans', 'Nunito', system-ui, -apple-system, sans-serif",
+      default: undefined,
+    }),
+  },
+  puzzleList: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  learnRow: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#38BDF820',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    gap: 12,
   },
-  heroBadgeText: {
-    color: '#38BDF8',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  heroTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    lineHeight: 28,
-  },
-  heroDesc: {
+  learnText: {
+    flex: 1,
     fontSize: 14,
     lineHeight: 20,
-  },
-  sectionHeading: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    marginBottom: 12,
-    marginLeft: 4,
+    color: HOME_THEME.textMuted,
+    fontFamily: Platform.select({
+      web: "'DM Sans', 'Nunito', system-ui, -apple-system, sans-serif",
+      default: undefined,
+    }),
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderWidth: 1.5,
-    borderColor: '#ef4444',
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderWidth: 1,
+    borderColor: '#EF4444',
     borderRadius: 14,
     padding: 14,
     marginBottom: 16,
     gap: 12,
   },
   errorTitle: {
-    color: '#ef4444',
+    color: '#EF4444',
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   errorSubtitle: {
-    color: '#f87171',
+    color: '#F87171',
     fontSize: 13,
     marginTop: 2,
   },
   retryButton: {
-    backgroundColor: '#ef4444',
+    backgroundColor: '#EF4444',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
   },
-  puzzleList: {
-    gap: 12,
-    marginBottom: 20,
-  },
-  puzzleCard: {
+  resumeCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    gap: 14,
-  },
-  puzzleIconBox: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  puzzleInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  puzzleName: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  puzzleBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  puzzleBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  puzzleDesc: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  howToCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
+    backgroundColor: HOME_THEME.surface,
+    borderColor: HOME_THEME.border,
     borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    justifyContent: 'space-between',
+  },
+  resumeCardContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
-  howToIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  resumeIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 180, 0, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  howToTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+  resumeTextWrap: {
+    flex: 1,
   },
-  howToSubtitle: {
+  resumeTitle: {
+    color: HOME_THEME.text,
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  resumeSubtitle: {
+    color: HOME_THEME.textMuted,
     fontSize: 12,
-    lineHeight: 16,
-    marginTop: 2,
+  },
+  resumeDismissBtn: {
+    padding: 8,
+    marginLeft: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

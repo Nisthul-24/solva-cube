@@ -396,6 +396,7 @@ export const CameraRig: React.FC<CameraRigProps> = ({
     const polarAngleDeg = (Math.acos(Math.max(-1, Math.min(1, currentDir.current.y))) * 180) / Math.PI;
 
     if (
+      Boolean(__DEV__) &&
       typeof window !== 'undefined' &&
       (window as any).__camLog !== undefined &&
       (window.location?.search?.includes('debug=1') || (window as any).__recordCamLog)

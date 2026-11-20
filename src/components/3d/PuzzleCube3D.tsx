@@ -103,30 +103,52 @@ function createContactShadowTexture(): THREE.Texture | null {
   }
 }
 
-// Letter texture cache for web
+// Letter texture and material cache for web
 const letterTexCache: Record<string, THREE.CanvasTexture> = {};
-function getLetterTexture(letter: string, textColor: string): THREE.Texture | null {
-  if (typeof document === 'undefined') return null;
+const letterMatCache: Record<string, THREE.MeshBasicMaterial> = {};
+
+export function getLetterMaterial(color: string): THREE.MeshBasicMaterial | null {
+  if (!color) return null;
+  const letter = color[0].toUpperCase();
+  const isDarkText = color === 'white' || color === 'yellow' || color === 'orange' || color === 'green';
+  const textColor = isDarkText ? '#111111' : '#FFFFFF';
   const key = `${letter}_${textColor}`;
-  if (letterTexCache[key]) return letterTexCache[key];
+  if (letterMatCache[key]) return letterMatCache[key];
+
+  if (typeof document === 'undefined') return null;
 
   try {
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
+    let texture = letterTexCache[key];
+    if (!texture) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
 
-    ctx.clearRect(0, 0, 128, 128);
-    ctx.fillStyle = textColor;
-    ctx.font = '900 80px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(letter, 64, 66);
+      ctx.clearRect(0, 0, 128, 128);
+      ctx.fillStyle = textColor;
+      ctx.font = '900 82px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(letter, 64, 65);
 
-    const texture = new THREE.CanvasTexture(canvas);
-    letterTexCache[key] = texture;
-    return texture;
+      texture = new THREE.CanvasTexture(canvas);
+      letterTexCache[key] = texture;
+    }
+
+    const mat = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+      side: THREE.FrontSide,
+    });
+    letterMatCache[key] = mat;
+    return mat;
   } catch (e) {
     return null;
   }
@@ -189,7 +211,7 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
   }, [gl, scene]);
 
   // Shared Geometries (created once for high performance 60fps)
-  const { cubieGeometry, cubieMaterial, stickerGeometry, contactShadowTexture } = useMemo(() => {
+  const { cubieGeometry, cubieMaterial, stickerGeometry, letterQuadGeometry, contactShadowTexture } = useMemo(() => {
     const cubieGeom = new RoundedBoxGeometry(0.97, 0.97, 0.97, 4, 0.07);
     const cubieMat = new THREE.MeshStandardMaterial({
       color: '#0b0d12',
@@ -208,12 +230,14 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
     });
     stickerGeom.center();
 
+    const letterGeom = new THREE.PlaneGeometry(0.48, 0.48);
     const shadowTex = createContactShadowTexture();
 
     return {
       cubieGeometry: cubieGeom,
       cubieMaterial: cubieMat,
       stickerGeometry: stickerGeom,
+      letterQuadGeometry: letterGeom,
       contactShadowTexture: shadowTex,
     };
   }, []);
@@ -665,12 +689,12 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
         let norm: THREE.Vector3;
         if (dimension === 4) {
           if (stepPlan) {
-            pos = new THREE.Vector3(...stepPlan.layerCentroid).multiplyScalar(0.6);
+            pos = new THREE.Vector3(...stepPlan.layerCentroid).multiplyScalar(0.75);
             norm = new THREE.Vector3(...stepPlan.axis);
           } else {
             const eng = getPuzzleEngine('4x4');
             const m = eng.getMove(activeNotation);
-            pos = m ? new THREE.Vector3(...m.layerCentroid).multiplyScalar(0.6) : new THREE.Vector3();
+            pos = m ? new THREE.Vector3(...m.layerCentroid).multiplyScalar(0.75) : new THREE.Vector3();
             norm = m ? new THREE.Vector3(...m.axis) : new THREE.Vector3(...unified.axis);
           }
         } else {
@@ -697,7 +721,7 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
 
     // Floating Face Labels
     if (onUpdateLabels) {
-      const faceDist = dimension === 4 ? 2.15 : dimension === 2 ? 1.05 : 1.62;
+      const faceDist = dimension === 2 ? 1.05 : 1.62;
       const faceConfigs: Array<{
         face: FaceName3x3;
         name: string;
@@ -794,9 +818,7 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
           const isCursor = interactivePainting && activeFace === st.face && activeStickerCursor === st.index;
           const isGlow = false;
 
-          const letter = st.color ? st.color[0].toUpperCase() : '';
-          const textColor = st.color === 'white' || st.color === 'yellow' ? '#0B1120' : '#FFFFFF';
-          const letterTex = showColorBlindLetters ? getLetterTexture(letter, textColor) : null;
+          const letterMat = showColorBlindLetters ? getLetterMaterial(st.color) : null;
 
           return (
             <group key={sidx}>
@@ -831,12 +853,14 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
                 />
               </mesh>
 
-              {/* Colour-blind letter overlay */}
-              {showColorBlindLetters && letterTex && (
-                <mesh position={[pos[0] * 1.01, pos[1] * 1.01, pos[2] * 1.01]} rotation={rot}>
-                  <planeGeometry args={[0.55, 0.55]} />
-                  <meshBasicMaterial map={letterTex} transparent opacity={0.9} />
-                </mesh>
+              {/* Colour-blind letter overlay (3-4% above sticker surface, reusable quad & material) */}
+              {showColorBlindLetters && letterMat && (
+                <mesh
+                  geometry={letterQuadGeometry}
+                  material={letterMat}
+                  position={[nx * 0.525, ny * 0.525, nz * 0.525]}
+                  rotation={rot}
+                />
               )}
             </group>
           );
@@ -845,8 +869,8 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
     );
   };
 
-  // Dev debug overlay (?debug=1)
-  const isDebug = typeof window !== 'undefined' && Boolean((window as any).location?.search?.includes('debug=1'));
+  // Dev debug overlay (?debug=1) - only active in development mode
+  const isDebug = Boolean(__DEV__ && typeof window !== 'undefined' && (window as any).location?.search?.includes('debug=1'));
 
   const debugOverlayData = useMemo(() => {
     if (!isDebug || !currentMoveNotation || isSolved || dimension !== 4) return null;
@@ -923,7 +947,7 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
         autoViewMode={autoViewMode}
         isSlowSpeed={turnDurationMs >= 2800}
         isAnimatingLayer={isAnimating}
-        baseDistance={dimension === 4 ? 11.0 : 4.8}
+        baseDistance={4.8}
         userAzimuth={cameraAzimuth}
         userElevation={cameraElevation}
         onCameraGlideComplete={onCameraMoveComplete}
@@ -948,7 +972,7 @@ export const PuzzleCube3D: React.FC<PuzzleCube3DProps> = ({
       <group
         scale={
           dimension === 4
-            ? [0.6, 0.6, 0.6]
+            ? [0.75, 0.75, 0.75]
             : dimension === 2
             ? [1.38, 1.38, 1.38]
             : [1, 1, 1]

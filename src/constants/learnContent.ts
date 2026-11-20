@@ -1,4 +1,5 @@
 import { PuzzleId } from '../types/puzzle';
+import { getPuzzleEngine } from '../puzzleEngine/puzzleEngine';
 
 export interface NotationItem {
   move: string;
@@ -13,6 +14,13 @@ export interface LearnSection {
   bullets?: string[];
 }
 
+export interface SolutionStepItem {
+  number: number;
+  title: string;
+  desc: string;
+  detail?: string;
+}
+
 export interface PuzzleLearnContent {
   puzzleId: PuzzleId;
   title: string;
@@ -24,14 +32,67 @@ export interface PuzzleLearnContent {
     description: string;
     opposites?: string[];
   };
+  solutionSteps?: SolutionStepItem[];
+  parityDefinition?: string;
   notations: NotationItem[];
   tips: string[];
+}
+
+/**
+ * Dynamically generates 4x4 move notation from the app's real puzzleEngine
+ * ensuring descriptions, directions, and layer names always match the player.
+ */
+export function get4x4DynamicNotations(): NotationItem[] {
+  const eng = getPuzzleEngine('4x4');
+  const allMoves = [
+    // Outer layers
+    'R', "R'", 'R2',
+    'L', "L'", 'L2',
+    'U', "U'", 'U2',
+    'D', "D'", 'D2',
+    'F', "F'", 'F2',
+    'B', "B'", 'B2',
+    // Wide turns (two layers together)
+    'Rw', "Rw'", 'Rw2',
+    'Lw', "Lw'", 'Lw2',
+    'Uw', "Uw'", 'Uw2',
+    'Dw', "Dw'", 'Dw2',
+    'Fw', "Fw'", 'Fw2',
+    'Bw', "Bw'", 'Bw2',
+    // Inner slice single turns (lowercase notation)
+    'r', "r'", 'r2',
+    'l', "l'", 'l2',
+    'u', "u'", 'u2',
+    'd', "d'", 'd2',
+    'f', "f'", 'f2',
+    'b', "b'", 'b2',
+    // Inner slice numerical prefix (2R notation alias)
+    '2R', "2R'", '2R2',
+    '2L', "2L'", '2L2',
+    '2U', "2U'", '2U2',
+    '2D', "2D'", '2D2',
+    '2F', "2F'", '2F2',
+    '2B', "2B'", '2B2',
+  ];
+
+  return allMoves.map((m) => {
+    const info = eng.getMove(m);
+    const desc = info?.fullInstruction || `Turn ${m}`;
+    const dir: 'CW' | 'CCW' | 'DOUBLE' = info?.isDouble ? 'DOUBLE' : info?.isCCW ? 'CCW' : 'CW';
+    const face = info?.layerName || 'Layer';
+    return {
+      move: m,
+      desc,
+      dir,
+      face,
+    };
+  });
 }
 
 export const PUZZLE_LEARN_CONTENT: Record<PuzzleId, PuzzleLearnContent> = {
   '3x3': {
     puzzleId: '3x3',
-    title: "3x3 Rubik's Cube",
+    title: '3x3 Cube',
     howToHold: {
       description: 'When entering colours or following the step-by-step solution, hold your cube steadily with:',
       bullets: [
@@ -156,39 +217,51 @@ export const PUZZLE_LEARN_CONTENT: Record<PuzzleId, PuzzleLearnContent> = {
     puzzleId: '4x4',
     title: '4x4 Revenge Cube',
     howToHold: {
-      description: 'Hold the 4x4 with the derived orientation:',
+      description: 'The 4x4 has no fixed centres, so orientation comes strictly from the corners. Pick a reference pair like White on Top and Green in Front, and maintain that exact orientation steadily throughout all steps:',
       bullets: [
-        'Top face pointing UP (determined by your cube scheme)',
-        'Front face facing directly toward YOU',
-        'Keep the same orientation during each stage',
+        'White on Top and Green facing you (or any fixed colour pair)',
+        'Orientation comes from the corners (no fixed centres), so keep the same orientation throughout',
+        'Keep your grip steady without rotating the whole cube between steps',
       ],
     },
     colorLayout: {
-      description: 'The 4x4 has no fixed centers; the 8 corner pieces define the color layout:',
+      description: 'With no fixed centres, the 8 corner pieces determine the true colour layout:',
       opposites: [
-        'Colors that never appear together on a corner are opposite pairs',
-        'Cyclic corner order defines chirality (right-handed vs left-handed)',
-        'Works with standard, Japanese, and any brand layout',
+        'White is opposite Yellow',
+        'Green is opposite Blue',
+        'Red is opposite Orange',
       ],
     },
-    notations: [
-      { move: 'R', desc: 'Turn outer RIGHT layer 90° clockwise (upwards)', dir: 'CW', face: 'Right' },
-      { move: "R'", desc: 'Turn outer RIGHT layer 90° counter-clockwise (downwards)', dir: 'CCW', face: 'Right' },
-      { move: 'Rw', desc: 'Turn two RIGHT layers 90° clockwise (wide turn)', dir: 'CW', face: 'Right Wide' },
-      { move: "Rw'", desc: 'Turn two RIGHT layers 90° counter-clockwise', dir: 'CCW', face: 'Right Wide' },
-      { move: 'r', desc: 'Turn inner RIGHT slice 90° clockwise (second layer)', dir: 'CW', face: 'Inner Right' },
-      { move: "r'", desc: 'Turn inner RIGHT slice 90° counter-clockwise', dir: 'CCW', face: 'Inner Right' },
-      { move: 'U', desc: 'Turn outer TOP layer 90° clockwise', dir: 'CW', face: 'Top' },
-      { move: 'Uw', desc: 'Turn two TOP layers 90° clockwise (wide turn)', dir: 'CW', face: 'Top Wide' },
-      { move: 'u', desc: 'Turn inner TOP slice 90° clockwise', dir: 'CW', face: 'Inner Top' },
-      { move: 'F', desc: 'Turn outer FRONT layer 90° clockwise', dir: 'CW', face: 'Front' },
-      { move: 'Fw', desc: 'Turn two FRONT layers 90° clockwise (wide turn)', dir: 'CW', face: 'Front Wide' },
-      { move: 'f', desc: 'Turn inner FRONT slice 90° clockwise', dir: 'CW', face: 'Inner Front' },
+    solutionSteps: [
+      {
+        number: 1,
+        title: 'Solve Centres',
+        desc: 'Group the 2×2 centre blocks on all 6 faces using inner slice and wide turns.',
+      },
+      {
+        number: 2,
+        title: 'Pair Edges',
+        desc: 'Match all 12 edge pairs (24 edge pieces into composite 2×1 edge blocks).',
+      },
+      {
+        number: 3,
+        title: '3x3 Stage',
+        desc: 'Solve the cube like a standard 3x3 using only outer layer turns.',
+      },
+      {
+        number: 4,
+        title: 'Fix Parities',
+        desc: 'Resolve special 4x4 states using slice algorithms.',
+        detail: 'A state impossible on a 3x3 caused by edge/corner swaps within the extra slices.',
+      },
     ],
+    parityDefinition: 'A state impossible on a 3x3 caused by edge/corner swaps within the extra slices.',
+    notations: get4x4DynamicNotations(),
     tips: [
-      'Outer face moves (R, U, F, etc.) turn only the single outermost layer.',
-      'Wide moves (Rw, Uw, Fw, etc.) turn the outer two layers together.',
-      'Inner slice moves (r, u, f, etc.) turn only the second layer from the face.',
+      'Outer face moves (R, U, F, D, L, B) turn only the single outermost layer.',
+      'Wide turns (Rw, Uw, Fw, Dw, Lw, Bw) turn the outer two layers together.',
+      'Inner slice turns (r / 2R, u / 2U, etc.) turn only the second layer from that face.',
+      "An apostrophe (') denotes prime (counter-clockwise), and 2 denotes a 180° half turn.",
     ],
   },
 };

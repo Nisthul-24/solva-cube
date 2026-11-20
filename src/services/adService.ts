@@ -1,6 +1,11 @@
 import { Platform } from 'react-native';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { useSettingsStore } from '../store/settingsStore';
+import {
+  getAdUnitId,
+  getTestDeviceIdentifiers,
+  ADS_TIMING_RULES,
+} from '../constants/adsConfig';
 
 // Safe check: Is running inside Expo Go client?
 export const isExpoGo =
@@ -32,34 +37,19 @@ if (!isExpoGo) {
 }
 
 export const AD_CONFIG = {
-  USE_TEST_IDS: true,
-  PRODUCTION_IDS: {
-    BANNER: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
-    INTERSTITIAL: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
-    REWARDED: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
-  },
-  MIN_INTERSTITIAL_GAP_MS: 3 * 60 * 1000,
+  MIN_INTERSTITIAL_GAP_MS: ADS_TIMING_RULES.INTERSTITIAL_COOLDOWN_MS,
 };
 
 export function getBannerAdUnitId(): string {
-  if (TestIds && (AD_CONFIG.USE_TEST_IDS || __DEV__)) {
-    return TestIds.ADAPTIVE_BANNER;
-  }
-  return AD_CONFIG.PRODUCTION_IDS.BANNER;
+  return getAdUnitId('banner');
 }
 
 export function getInterstitialAdUnitId(): string {
-  if (TestIds && (AD_CONFIG.USE_TEST_IDS || __DEV__)) {
-    return TestIds.INTERSTITIAL;
-  }
-  return AD_CONFIG.PRODUCTION_IDS.INTERSTITIAL;
+  return getAdUnitId('interstitial');
 }
 
 export function getRewardedAdUnitId(): string {
-  if (TestIds && (AD_CONFIG.USE_TEST_IDS || __DEV__)) {
-    return TestIds.REWARDED;
-  }
-  return AD_CONFIG.PRODUCTION_IDS.REWARDED;
+  return getAdUnitId('rewarded');
 }
 
 class AdService {
@@ -87,6 +77,14 @@ class AdService {
           const status = formResult.status === AdsConsentStatus?.OBTAINED ? 'granted' : 'denied';
           useSettingsStore.getState().setConsentStatus(status);
         }
+      }
+
+      try {
+        await mobileAds().setRequestConfiguration({
+          testDeviceIdentifiers: getTestDeviceIdentifiers(),
+        });
+      } catch (e) {
+        // non-blocking
       }
 
       await mobileAds().initialize();

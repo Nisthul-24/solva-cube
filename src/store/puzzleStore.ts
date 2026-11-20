@@ -24,6 +24,7 @@ interface PuzzleStoreState {
   undo: () => void;
   resetState: () => void;
   fillSampleScramble: () => void;
+  setCurrentState: (state: any) => void;
   solveCurrentState: () => Promise<boolean>;
 
   // Solution Player controls
@@ -36,6 +37,7 @@ interface PuzzleStoreState {
   dismissCelebration: () => void;
 
   loadSavedState: () => Promise<void>;
+  restoreSolutionSession: (puzzleId: PuzzleId, state: any, solutionMoves: Move[], currentMoveIndex: number) => void;
 }
 
 const STORAGE_PREFIX = '@solvacube_state_';
@@ -170,6 +172,19 @@ export const usePuzzleStore = create<PuzzleStoreState>((set, get) => ({
     hapticFeedback.medium();
     const scrambleMovesCount = activePuzzleId === '3x3' ? 14 : activePuzzleId === '2x2' ? 6 : 8;
     const { state } = puzzle.scramble(scrambleMovesCount);
+    set({
+      currentState: state,
+      undoStack: [],
+      solveError: null,
+      solutionMoves: [],
+      currentMoveIndex: 0,
+      isPlaying: false,
+    });
+    saveState(activePuzzleId, state);
+  },
+
+  setCurrentState: (state: any) => {
+    const { activePuzzleId } = get();
     set({
       currentState: state,
       undoStack: [],
@@ -377,6 +392,20 @@ export const usePuzzleStore = create<PuzzleStoreState>((set, get) => ({
         }
       }
     } catch {}
+  },
+
+  restoreSolutionSession: (puzzleId: PuzzleId, state: any, solutionMoves: Move[], currentMoveIndex: number) => {
+    set({
+      activePuzzleId: puzzleId,
+      currentState: state,
+      solutionMoves,
+      currentMoveIndex,
+      isPlaying: false,
+      showSolvedCelebration: false,
+      undoStack: [],
+      solveError: null,
+    });
+    saveState(puzzleId, state);
   },
 }));
 

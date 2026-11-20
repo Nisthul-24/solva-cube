@@ -27,9 +27,18 @@ export function BannerAdComponent() {
   // In Expo Go or Web, render a clean banner preview placeholder
   if (isExpoGo || !BannerAd || !BannerAdSize) {
     return (
-      <View style={[styles.container, styles.mockBanner, { borderColor: isDarkMode ? '#334155' : '#E2E8F0' }]}>
-        <Text style={[styles.mockText, { color: isDarkMode ? '#64748B' : '#94A3B8' }]}>
-          AdMob Adaptive Banner • Active in Release APK
+      <View
+        style={[
+          styles.container,
+          styles.mockBanner,
+          {
+            borderColor: '#3A352E',
+            backgroundColor: '#2B2722',
+          },
+        ]}
+      >
+        <Text style={[styles.mockText, { color: '#B3AA9A' }]}>
+          Ad
         </Text>
       </View>
     );
@@ -61,18 +70,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   mockBanner: {
-    height: 48,
+    height: 44,
     borderWidth: 1,
     borderRadius: 8,
     marginVertical: 4,
     marginHorizontal: 16,
     width: '92%',
     alignSelf: 'center',
-    borderStyle: 'dashed',
+    borderStyle: 'solid',
   },
   mockText: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '500',
     letterSpacing: 0.2,
   },
 });

@@ -184,6 +184,7 @@ class Shape {
 }
 
 class BoxGeometry extends BufferGeometry {}
+class PlaneGeometry extends BufferGeometry {}
 class ExtrudeGeometry extends BufferGeometry {}
 class MeshBasicMaterial {}
 class MeshStandardMaterial {}
@@ -353,6 +354,7 @@ module.exports = {
   BufferGeometry,
   BufferAttribute,
   BoxGeometry,
+  PlaneGeometry,
   Shape,
   ExtrudeGeometry,
   MeshBasicMaterial,

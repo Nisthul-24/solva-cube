@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,14 @@ export default function GalleryScreen() {
   const [puzzleType, setPuzzleType] = useState<'4x4' | 'pyraminx'>(initialPuzzle);
   const [sheetIndex, setSheetIndex] = useState(0);
 
+  const isProd = typeof __DEV__ !== 'undefined' && !__DEV__;
+
+  useEffect(() => {
+    if (isProd) {
+      router.replace('/');
+    }
+  }, [router, isProd]);
+
   const eng = useMemo(() => getPuzzleEngine(puzzleType), [puzzleType]);
   const allMoves = useMemo(() => Array.from(eng.moves.values()), [eng]);
   const moves = useMemo(() => {
@@ -39,13 +47,17 @@ export default function GalleryScreen() {
       const std = getStandardMoveNotation(puzzleType, m.name).toLowerCase();
       return req.includes(n) || req.includes(std);
     });
-  }, [allMoves, searchParams.moves]);
+  }, [allMoves, searchParams.moves, puzzleType]);
 
   const totalSheets = Math.ceil(moves.length / MOVES_PER_SHEET);
   const currentSheetMoves = useMemo(() => {
     const start = sheetIndex * MOVES_PER_SHEET;
     return moves.slice(start, start + MOVES_PER_SHEET);
   }, [moves, sheetIndex]);
+
+  if (isProd) {
+    return null;
+  }
 
   // Compute camera angles for a move
   const getCameraPoseForMove = (moveName: string) => {

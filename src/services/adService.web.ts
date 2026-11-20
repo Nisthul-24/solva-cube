@@ -1,15 +1,10 @@
 import { useSettingsStore } from '../store/settingsStore';
+import { ADS_TIMING_RULES } from '../constants/adsConfig';
 
 export const isExpoGo = true;
 
 export const AD_CONFIG = {
-  USE_TEST_IDS: true,
-  PRODUCTION_IDS: {
-    BANNER: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
-    INTERSTITIAL: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
-    REWARDED: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
-  },
-  MIN_INTERSTITIAL_GAP_MS: 3 * 60 * 1000,
+  MIN_INTERSTITIAL_GAP_MS: ADS_TIMING_RULES.INTERSTITIAL_COOLDOWN_MS,
 };
 
 export function getBannerAdUnitId(): string {

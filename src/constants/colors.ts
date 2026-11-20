@@ -31,18 +31,18 @@ export const COLORBLIND_COLORS: Record<PuzzleColor, ColorScheme> = {
 
 export const UI_COLORS = {
   dark: {
-    bg: '#0F172A',
-    surface: '#1E293B',
-    surfaceHover: '#334155',
-    border: '#334155',
-    text: '#F8FAFC',
-    textSecondary: '#94A3B8',
-    primary: '#38BDF8',
-    primaryDark: '#0284C7',
+    bg: '#181614',
+    surface: '#221F1B',
+    surfaceHover: '#2B2722',
+    border: '#3A352E',
+    text: '#F4EFE6',
+    textSecondary: '#B3AA9A',
+    primary: '#FFB400',
+    primaryDark: '#D99B00',
     success: '#10B981',
     error: '#EF4444',
-    warning: '#F59E0B',
-    card: '#1E293B',
+    warning: '#FFB400',
+    card: '#221F1B',
   },
   light: {
     bg: '#F8FAFC',
