@@ -1,6 +1,9 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  globals: {
+    __DEV__: true,
+  },
   testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.test.tsx'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   transform: {
@@ -22,6 +25,7 @@ module.exports = {
     '^expo-router$': '<rootDir>/__mocks__/expo-router.js',
     '^react-native-safe-area-context$': '<rootDir>/__mocks__/safe-area-context.js',
     '^expo-status-bar$': '<rootDir>/__mocks__/expo-status-bar.js',
+    '^expo-camera$': '<rootDir>/__mocks__/expo-camera.js',
     '^expo-constants$': '<rootDir>/__mocks__/expo-constants.js',
     '^react-native-reanimated$': '<rootDir>/__mocks__/reanimated.js',
     '^react-native-google-mobile-ads$': '<rootDir>/__mocks__/google-mobile-ads.js',

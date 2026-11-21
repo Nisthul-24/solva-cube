@@ -154,7 +154,8 @@ export const Cube3DView: React.FC<Cube3DViewProps> = ({
     [onStickerClick]
   );
 
-  const isDebug = Boolean(__DEV__ && typeof window !== 'undefined' && window.location?.search?.includes('debug=1'));
+  const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
+  const isDebug = Boolean(isDev && typeof window !== 'undefined' && window.location?.search?.includes('debug=1'));
   const isEdgeOn = devInfo ? Math.abs(devInfo.dot) < 0.2 : false;
   const showEdgeOnHint = isEdgeOn && autoViewMode === 'off' && unified && !isSolved;
 

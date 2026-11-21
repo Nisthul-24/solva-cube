@@ -556,21 +556,27 @@ describe('GATE 1: One Source of Truth (puzzleEngine Consistency Suite)', () => {
       const deltaAngle = 0.12 * m.angle;
 
       const turnPieces = eng4x4.pieces.filter((p) => m.turningPieceSet.has(p.id));
-      const st = turnPieces[0].stickers[0];
-      const p0 = st.centroid;
-      const p12 = rotateAroundAxis(p0, m.axis, deltaAngle);
-      const disp = sub(p12, p0);
+      const stickers = turnPieces.flatMap((p) => p.stickers);
 
-      // Find nearest arc point to p0
+      // Find the sticker closest to the arrow arc points
+      let bestSticker = stickers[0];
       let bestArcPt = m.arrow.arcPoints[0];
-      let bestDist = Infinity;
-      for (const arcPt of m.arrow.arcPoints) {
-        const d = norm(sub(arcPt, p0));
-        if (d < bestDist) {
-          bestDist = d;
-          bestArcPt = arcPt;
+      let minDistance = Infinity;
+
+      for (const st of stickers) {
+        for (const arcPt of m.arrow.arcPoints) {
+          const d = norm(sub(arcPt, st.centroid));
+          if (d < minDistance) {
+            minDistance = d;
+            bestSticker = st;
+            bestArcPt = arcPt;
+          }
         }
       }
+
+      const p0 = bestSticker.centroid;
+      const p12 = rotateAroundAxis(p0, m.axis, deltaAngle);
+      const disp = sub(p12, p0);
 
       // Corrupted directed tangent: inverted sign
       const radial = sub(bestArcPt, m.arrowCenter);

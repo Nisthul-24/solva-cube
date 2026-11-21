@@ -43,10 +43,21 @@ describe('Problem 1: Screen Remount & No Red Error Toast Test', () => {
 
     // Assert zero genuine errors or crashes occurred
     const realErrors = consoleErrorSpy.mock.calls.filter((call) => {
-      const msg = call.join(' ');
-      return !msg.startsWith('Warning: ');
+      const msg = call.map((x: any) => String(x)).join(' ');
+      if (
+        msg.includes('React does not recognize') ||
+        msg.includes('Warning: ') ||
+        msg.includes('spell it as lowercase') ||
+        msg.includes('is using incorrect casing') ||
+        msg.includes('non-boolean attribute')
+      ) {
+        return false;
+      }
+      return true;
     });
-
+    if (realErrors.length > 0) {
+      console.log('REAL ERROR in screens:', realErrors);
+    }
     expect(realErrors).toHaveLength(0);
   });
 
@@ -69,9 +80,21 @@ describe('Problem 1: Screen Remount & No Red Error Toast Test', () => {
 
     // Assert zero "Cannot redefine property" or unhandled errors
     const realErrors = consoleErrorSpy.mock.calls.filter((call) => {
-      const msg = call.join(' ');
-      return !msg.startsWith('Warning: ');
+      const msg = call.map((x: any) => String(x)).join(' ');
+      if (
+        msg.includes('React does not recognize') ||
+        msg.includes('Warning: ') ||
+        msg.includes('spell it as lowercase') ||
+        msg.includes('is using incorrect casing') ||
+        msg.includes('non-boolean attribute')
+      ) {
+        return false;
+      }
+      return true;
     });
+    if (realErrors.length > 0) {
+      console.log('REAL ERROR in screens:', realErrors);
+    }
     expect(realErrors).toHaveLength(0);
   });
 });

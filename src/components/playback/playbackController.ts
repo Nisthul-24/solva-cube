@@ -74,6 +74,9 @@ export class PlaybackController {
       } catch (e) {
         // ignore
       }
+      if (this.isPauseRequested) {
+        return;
+      }
     }
 
     const total = this.options.getTotalMoves();
@@ -115,11 +118,11 @@ export class PlaybackController {
             await this.waitForCameraGlide(currentRun);
             this.isBusy = false;
 
-            if (this.runId !== currentRun) {
-              break;
-            }
             if (this.isPauseRequested) {
               this.setState('paused');
+              break;
+            }
+            if (this.runId !== currentRun) {
               break;
             }
           }
@@ -129,11 +132,11 @@ export class PlaybackController {
           const waitMs = this.options.getArrowWaitDurationMs();
           await this.waitForArrowDelay(waitMs);
 
-          if (this.runId !== currentRun) {
-            break;
-          }
           if (this.isPauseRequested) {
             this.setState('paused');
+            break;
+          }
+          if (this.runId !== currentRun) {
             break;
           }
 
@@ -149,11 +152,11 @@ export class PlaybackController {
           this.options.onApplyMove(move, plan);
           await new Promise((resolve) => setTimeout(resolve, 0));
 
-          if (this.runId !== currentRun) {
-            break;
-          }
           if (this.isPauseRequested) {
             this.setState('paused');
+            break;
+          }
+          if (this.runId !== currentRun) {
             break;
           }
         }

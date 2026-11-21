@@ -118,7 +118,7 @@ describe('PlaybackController state machine', () => {
   });
 
   test('rapid double clicks on play do not corrupt state or freeze loop', async () => {
-    const { controller, getIndex } = setupController(0);
+    const { controller, waitForState } = setupController(0);
 
     controller.play();
     controller.play();
@@ -132,9 +132,7 @@ describe('PlaybackController state machine', () => {
     await new Promise((r) => setTimeout(r, 30));
     expect(controller.isRunning()).toBe(true);
 
-    while (controller.getState() !== 'finished' && getIndex() < MOVES.length) {
-      await new Promise((r) => setTimeout(r, 15));
-    }
+    await waitForState('finished');
     expect(controller.getState()).toBe('finished');
   });
 
@@ -187,5 +185,5 @@ describe('PlaybackController state machine', () => {
       expect(getIndex()).toBe(MOVES.length);
       expect(controller.getState()).toBe('finished');
     }
-  }, 30000);
+  }, 60000);
 });

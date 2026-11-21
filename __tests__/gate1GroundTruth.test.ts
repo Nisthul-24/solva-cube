@@ -273,31 +273,47 @@ describe('GATE 1: Ground-Truth Render & Framing Test Suite (4x4)', () => {
       const angle15 = move.angle * 0.15;
       const vp = { w: 768, h: 1024 };
       const camera = new THREE.PerspectiveCamera(fov, vp.w / vp.h, 0.1, 100);
-      camera.position.set(0, 0, cameraDistance);
+      const camDir = cameraDirections[0];
+      camera.position.copy(camDir).multiplyScalar(cameraDistance);
       camera.lookAt(0, 0, 0);
       camera.updateMatrixWorld();
       camera.updateProjectionMatrix();
 
       const turningPieces = eng.pieces.filter((p) => move.turningPieceSet.has(p.id));
+      let sumC15 = new Point2D(0, 0);
       let sumDisp = new Point2D(0, 0);
 
       for (const p of turningPieces) {
         const pt0 = new THREE.Vector3(...p.homeCentroid).multiplyScalar(scale);
-        // Broken rotation
+        // Broken rotation (inverted axis)
         const pt15 = rotatePoint(new THREE.Vector3(...p.homeCentroid), brokenAxis, angle15).multiplyScalar(scale);
         const s0 = projectToScreen(pt0, camera, vp.w, vp.h);
         const s15 = projectToScreen(pt15, camera, vp.w, vp.h);
+        sumC15.add(s15);
         sumDisp.add(s15.sub(s0));
       }
 
       const count = turningPieces.length;
+      const C = new Point2D(sumC15.x / count, sumC15.y / count);
       const D_broken = new Point2D(sumDisp.x / count, sumDisp.y / count);
-      const arc = move.arrow.arcPoints;
-      const p1 = projectToScreen(new THREE.Vector3(...arc[0]).multiplyScalar(scale), camera, vp.w, vp.h);
-      const p2 = projectToScreen(new THREE.Vector3(...arc[1]).multiplyScalar(scale), camera, vp.w, vp.h);
-      const T = p2.sub(p1).normalize();
 
-      const dotProd = T.dot(D_broken.normalize());
+      let nearestArcTangent: Point2D = new Point2D(0, 0);
+      let minArcDist = Infinity;
+      const arc = move.arrow.arcPoints;
+      for (let i = 0; i < arc.length - 1; i++) {
+        const pt3d = new THREE.Vector3(...arc[i]).multiplyScalar(scale);
+        const next3d = new THREE.Vector3(...arc[i + 1]).multiplyScalar(scale);
+        const spt = projectToScreen(pt3d, camera, vp.w, vp.h);
+        const snext = projectToScreen(next3d, camera, vp.w, vp.h);
+
+        const dToC = spt.distanceTo(C);
+        if (dToC < minArcDist) {
+          minArcDist = dToC;
+          nearestArcTangent = snext.sub(spt);
+        }
+      }
+
+      const dotProd = nearestArcTangent.normalize().dot(D_broken.normalize());
       // Tangent dot product with inverted motion is negative (< 0) -> Proves test detects errors!
       expect(dotProd).toBeLessThan(0);
     });

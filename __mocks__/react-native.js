@@ -4,9 +4,18 @@ function cleanProps(props) {
   if (!props) return {};
   const {
     accessibilityRole,
+    accessibilityLabel,
+    accessibilityState,
+    onLayout,
     contentContainerStyle,
     showsVerticalScrollIndicator,
     showsHorizontalScrollIndicator,
+    scrollEventThrottle,
+    numberOfLines,
+    onScroll,
+    keyboardShouldPersistTaps,
+    bounces,
+    overScrollMode,
     activeOpacity,
     ...rest
   } = props;
@@ -27,7 +36,11 @@ module.exports = {
   TouchableOpacity: (props) => React.createElement('button', cleanProps(props), props?.children),
   Pressable: (props) => React.createElement('button', cleanProps(props), props?.children),
   ScrollView: (props) => React.createElement('div', cleanProps(props), props?.children),
-  Modal: (props) => React.createElement('div', cleanProps(props), props?.children),
+  Modal: (props) => {
+    if (props && props.visible === false) return null;
+    const { visible, ...rest } = props || {};
+    return React.createElement('div', cleanProps(rest), props?.children);
+  },
   ActivityIndicator: (props) => React.createElement('div', cleanProps(props), props?.children),
   TextInput: (props) => React.createElement('input', cleanProps(props)),
   Switch: (props) => React.createElement('input', { type: 'checkbox', ...cleanProps(props) }),

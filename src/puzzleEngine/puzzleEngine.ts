@@ -219,11 +219,11 @@ function build4x4WordingFromVocab(
     layerDesc = `the two ${sideName} layers`;
     layerName = `${capSide} two layers`;
   } else if (isInner) {
-    layerDesc = `the inner layer second from the ${sideName}`;
+    layerDesc = `the second layer from the ${sideName}`;
     layerName = `Inner ${sideName} slice`;
   } else {
-    layerDesc = `the outer ${sideName} layer`;
-    layerName = `Outer ${sideName} layer`;
+    layerDesc = `the ${sideName} layer`;
+    layerName = `${capSide} layer`;
   }
 
   // Direction word for front-perspective action
@@ -316,7 +316,7 @@ function build4x4Moves(pieces: EnginePiece[]): Map<string, EngineMove> {
           }
         }
       }
-      const arrowRadius = 1.15 * maxDistToAxis;
+      const arrowRadius = 1.18 * maxDistToAxis;
 
       // Orthonormal basis for arrow using the exact animation axis
       // Orient U towards canonical camera direction [1, 0.8, 1] so arrow faces user
@@ -526,7 +526,8 @@ function buildPyraminxMoves(pieces: EnginePiece[]): Map<string, EngineMove> {
             }
           }
         }
-        const arrowRadius = 1.15 * maxDistToAxis;
+        const rhoCut = Math.sqrt(8 / 3) * (1 - threshold);
+        const arrowRadius = 1.25 * rhoCut;
 
         const { U, V } = getOrthonormalBasis(axis);
         // Width: 5% of model size (model edge length = sqrt(8) approx 2.828)
@@ -597,6 +598,7 @@ function buildPyraminxMoves(pieces: EnginePiece[]): Map<string, EngineMove> {
           permutation,
           turningPieceIds,
           turningPieceSet,
+          layerDesc,
           wording: layerDesc,
           layerName,
           fullInstruction,
@@ -645,7 +647,7 @@ class PuzzleEngineInstance implements PuzzleEngine {
       return { layerDesc: '', layerName: '', fullInstruction: '' };
     }
     return {
-      layerDesc: m.wording,
+      layerDesc: m.layerDesc || '',
       layerName: m.layerName,
       fullInstruction: m.fullInstruction,
     };

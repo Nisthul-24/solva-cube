@@ -40,6 +40,7 @@ import { adService } from '../src/services/adService';
 import { adController } from '../src/ads/adController';
 import { hapticFeedback } from '../src/services/hapticsService';
 import { OPEN_SOURCE_LICENSES } from '../src/constants/licensesData';
+import { PRIVACY_POLICY_URL } from '../src/constants/links';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -75,7 +76,7 @@ export default function SettingsScreen() {
   };
 
   const handlePrivacyPolicy = () => {
-    Linking.openURL('https://solvacube.app/privacy-policy.html').catch(() => {
+    Linking.openURL(PRIVACY_POLICY_URL).catch(() => {
       Alert.alert(
         'Privacy Policy',
         'SolvaCube respects your privacy. We do not collect or sell personal data. Google AdMob and UMP collect diagnostic and ad-related identifiers only.'
