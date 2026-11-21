@@ -612,23 +612,14 @@ export default function InputScreen() {
 
             {/* Right Column: Glass Sidebar */}
             <View style={styles.sidebarCol}>
-              <ScrollView
-                style={styles.sidebarScroll}
-                contentContainerStyle={styles.sidebarScrollContent}
-                showsVerticalScrollIndicator={false}
-              >
-                {renderPaletteAndControls()}
-              </ScrollView>
+              {renderPaletteAndControls()}
             </View>
           </View>
         ) : (
-          /* Portrait Mobile Layout */
-          <ScrollView
-            style={styles.portraitScroll}
-            contentContainerStyle={styles.portraitScrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.stageMobile}>
+          /* Portrait Mobile Layout: Fixed Screen (No Scrolling) */
+          <View style={styles.portraitContainer}>
+            {/* 3D Canvas Stage */}
+            <View style={styles.stagePortrait}>
               {renderInstructionCard()}
               {render3DCanvas()}
 
@@ -660,8 +651,11 @@ export default function InputScreen() {
               </View>
             </View>
 
-            {renderPaletteAndControls()}
-          </ScrollView>
+            {/* Fixed Bottom Glass Palette & Controls Card */}
+            <View style={styles.bottomControlsWrap}>
+              {renderPaletteAndControls()}
+            </View>
+          </View>
         )}
 
         {/* Read-Only Flat Net Overview Modal */}
@@ -740,27 +734,24 @@ const styles = StyleSheet.create({
     flex: 0.95,
     maxWidth: 420,
     height: '100%',
-  },
-  sidebarScroll: {
-    flex: 1,
-  },
-  sidebarScrollContent: {
-    flexGrow: 1,
     justifyContent: 'center',
-    paddingVertical: 2,
   },
 
-  /* Portrait Layout */
-  portraitScroll: {
+  /* Portrait Fixed Layout (No Scrolling) */
+  portraitContainer: {
     flex: 1,
+    justifyContent: 'space-between',
   },
-  portraitScrollContent: {
-    paddingBottom: 24,
-  },
-  stageMobile: {
-    height: 380,
+  stagePortrait: {
+    flex: 1,
     width: '100%',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  bottomControlsWrap: {
+    flexShrink: 0,
+    paddingHorizontal: 10,
+    paddingBottom: 6,
   },
   canvasContainer: {
     width: '100%',
@@ -910,45 +901,50 @@ const styles = StyleSheet.create({
 
   /* Sidebar Card (Wide/Landscape) */
   glassSidebarCard: {
-    backgroundColor: 'rgba(4, 42, 54, 0.72)',
+    backgroundColor: 'rgba(4, 42, 54, 0.78)',
     borderWidth: 1.5,
     borderColor: 'rgba(34, 211, 238, 0.28)',
-    borderRadius: 22,
+    borderRadius: 20,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
     elevation: 5,
     gap: 6,
+    justifyContent: 'space-between',
   },
 
-  /* Bottom Sheet (Portrait) */
+  /* Bottom Controls Card (Portrait) */
   glassBottomSheet: {
-    backgroundColor: 'rgba(4, 42, 54, 0.78)',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: 'rgba(4, 42, 54, 0.82)',
+    borderRadius: 20,
     borderWidth: 1.5,
     borderColor: 'rgba(34, 211, 238, 0.28)',
-    padding: 16,
-    marginHorizontal: 10,
-    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
   },
 
   /* Palette Header */
   paletteHeaderRow: {
-    marginBottom: 6,
+    marginBottom: 2,
   },
   paletteHeading: {
     color: '#67E8F9',
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '800',
     letterSpacing: 0.6,
   },
   paletteSubheading: {
     color: '#A5F3FC',
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: '600',
     marginTop: 1,
     letterSpacing: 0.2,
@@ -958,8 +954,8 @@ const styles = StyleSheet.create({
   toolsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
-    marginVertical: 8,
+    gap: 6,
+    marginVertical: 4,
   },
   toolTileBtn: {
     flex: 1,
@@ -968,27 +964,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(6, 48, 62, 0.65)',
     borderWidth: 1.2,
     borderColor: 'rgba(34, 211, 238, 0.25)',
-    borderRadius: 14,
-    paddingVertical: 7,
+    borderRadius: 12,
+    paddingVertical: 5,
   },
   toolIconCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   toolTileText: {
     color: '#A5F3FC',
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
   },
 
   /* Glossy 3D Emerald Solve Button */
   glossySolveButton: {
-    height: 48,
-    borderRadius: 24,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#059669',
     borderWidth: 1.5,
     borderColor: '#34D399',
