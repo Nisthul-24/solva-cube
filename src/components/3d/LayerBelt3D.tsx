@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Axis } from './cubieModel';
 import { HighlightStyleOption } from '../../store/settingsStore';
 import { getPuzzleEngine } from '../../puzzleEngine/puzzleEngine';
@@ -231,7 +231,7 @@ export const LayerBelt3D: React.FC<LayerBelt3DProps> = ({
       const letter = cleanMove[0].toUpperCase();
       const isTip = cleanMove[0] === cleanMove[0].toLowerCase();
       const vCoord = vMap[letter];
-      if (!vCoord) return { glassGeom: null, outlineGeoms: [], cutLineGeom: null, glassPosition: [0, 0, 0] };
+      if (!vCoord) return { glassGeom: null, outlineGeoms: [], cutLineGeom: null, glassPosition: [0, 0, 0] as [number, number, number] };
 
       const tipVec = new THREE.Vector3(...vCoord);
       const adjKeys = Object.keys(vMap).filter((k) => k !== letter);
