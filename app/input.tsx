@@ -349,6 +349,7 @@ export default function InputScreen() {
           state={currentState as any}
           activeFace={activeFace as any}
           guidedMode={mode === 'guided'}
+          interactivePainting={true}
           autoViewMode={autoViewMode}
           showColorBlindLetters={showColorBlindLetters}
           offendingStickers={solveError?.offendingStickers as any}
@@ -585,7 +586,15 @@ export default function InputScreen() {
             </View>
 
             {/* Right Column: Glass Sidebar */}
-            <View style={styles.sidebarCol}>{renderPaletteAndControls()}</View>
+            <View style={styles.sidebarCol}>
+              <ScrollView
+                style={styles.sidebarScroll}
+                contentContainerStyle={styles.sidebarScrollContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {renderPaletteAndControls()}
+              </ScrollView>
+            </View>
           </View>
         ) : (
           /* Portrait Mobile Layout */
@@ -706,7 +715,14 @@ const styles = StyleSheet.create({
     flex: 0.95,
     maxWidth: 420,
     height: '100%',
+  },
+  sidebarScroll: {
+    flex: 1,
+  },
+  sidebarScrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
+    paddingVertical: 2,
   },
 
   /* Portrait Layout */
@@ -753,7 +769,8 @@ const styles = StyleSheet.create({
   },
   instructionTitleBox: {
     flex: 1,
-    marginRight: 8,
+    marginRight: 10,
+    minWidth: 0,
   },
   instructionCardTitle: {
     color: '#67E8F9',
@@ -765,6 +782,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexShrink: 0,
   },
   guidedToggleLabel: {
     color: '#A5F3FC',
@@ -810,13 +828,19 @@ const styles = StyleSheet.create({
   /* Front Orientation Label */
   frontTagWrap: {
     position: 'absolute',
-    bottom: 46,
+    bottom: 50,
     alignSelf: 'center',
     zIndex: 8,
+    backgroundColor: 'rgba(6, 48, 62, 0.55)',
+    paddingVertical: 3,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 211, 238, 0.22)',
   },
   frontTagText: {
     color: '#A5F3FC',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.5,
   },
@@ -824,7 +848,7 @@ const styles = StyleSheet.create({
   /* Stage Bottom Pills */
   stageBottomPillsRow: {
     position: 'absolute',
-    bottom: 8,
+    bottom: 10,
     left: 12,
     right: 12,
     zIndex: 10,
@@ -832,6 +856,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     gap: 8,
+    pointerEvents: 'box-none',
   },
   glassPill: {
     flexDirection: 'row',
@@ -864,12 +889,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(34, 211, 238, 0.28)',
     borderRadius: 22,
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
     elevation: 5,
+    gap: 6,
   },
 
   /* Bottom Sheet (Portrait) */
@@ -886,7 +913,7 @@ const styles = StyleSheet.create({
 
   /* Palette Header */
   paletteHeaderRow: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   paletteHeading: {
     color: '#67E8F9',
@@ -907,7 +934,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 8,
-    marginVertical: 12,
+    marginVertical: 8,
   },
   toolTileBtn: {
     flex: 1,

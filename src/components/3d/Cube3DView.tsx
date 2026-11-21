@@ -34,6 +34,9 @@ interface Cube3DViewProps {
   isSolved: boolean;
   interactivePainting?: boolean;
   activeStickerCursor?: number | null;
+  hideControls?: boolean;
+  hideTopBadge?: boolean;
+  hideFloatingLabels?: boolean;
   onAnimationComplete?: () => void;
   onCameraMoveComplete?: () => void;
   onAutoViewModeChange?: (mode: AutoViewOption) => void;
@@ -58,6 +61,9 @@ export const Cube3DView: React.FC<Cube3DViewProps> = ({
   isSolved,
   interactivePainting = false,
   activeStickerCursor,
+  hideControls,
+  hideTopBadge,
+  hideFloatingLabels,
   onAnimationComplete,
   onCameraMoveComplete,
   onAutoViewModeChange,
@@ -233,49 +239,53 @@ export const Cube3DView: React.FC<Cube3DViewProps> = ({
       )}
 
       {/* Floating Face Labels Overlay */}
-      <View style={styles.labelsOverlay} pointerEvents="none">
-        {floatingLabels.map((lbl) => {
-          if (!lbl.visible) return null;
-          return (
-            <View
-              key={lbl.face}
-              style={[
-                styles.floatingBadge,
-                {
-                  left: lbl.screenX - 32,
-                  top: lbl.screenY - 14,
-                  borderColor: lbl.isHighlighted ? '#22d3ee' : 'rgba(255,255,255,0.18)',
-                  backgroundColor: lbl.isHighlighted ? 'rgba(34,211,238,0.22)' : 'rgba(15,23,42,0.75)',
-                  transform: [{ scale: lbl.isHighlighted ? 1.08 : 0.95 }],
-                },
-              ]}
-            >
-              <View style={[styles.colorDot, { backgroundColor: lbl.dotColor }]} />
-              <Text
+      {!hideFloatingLabels && !interactivePainting && (
+        <View style={styles.labelsOverlay} pointerEvents="none">
+          {floatingLabels.map((lbl) => {
+            if (!lbl.visible) return null;
+            return (
+              <View
+                key={lbl.face}
                 style={[
-                  styles.labelText,
+                  styles.floatingBadge,
                   {
-                    color: lbl.isHighlighted ? '#22d3ee' : '#F8FAFC',
-                    fontWeight: lbl.isHighlighted ? '800' : '600',
+                    left: lbl.screenX - 32,
+                    top: lbl.screenY - 14,
+                    borderColor: lbl.isHighlighted ? '#22d3ee' : 'rgba(255,255,255,0.18)',
+                    backgroundColor: lbl.isHighlighted ? 'rgba(34,211,238,0.22)' : 'rgba(15,23,42,0.75)',
+                    transform: [{ scale: lbl.isHighlighted ? 1.08 : 0.95 }],
                   },
                 ]}
               >
-                {lbl.name}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
+                <View style={[styles.colorDot, { backgroundColor: lbl.dotColor }]} />
+                <Text
+                  style={[
+                    styles.labelText,
+                    {
+                      color: lbl.isHighlighted ? '#22d3ee' : '#F8FAFC',
+                      fontWeight: lbl.isHighlighted ? '800' : '600',
+                    },
+                  ]}
+                >
+                  {lbl.name}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       {/* Top Helper Badge: "White on top · Green facing you" */}
-      <View style={styles.topBadgeContainer} pointerEvents="none">
-        <View style={styles.orientationBadge}>
-          <Compass size={14} color="#22d3ee" style={{ marginRight: 6 }} />
-          <Text style={styles.orientationText}>
-            White on top <Text style={{ color: '#22d3ee' }}>·</Text> Green facing you
-          </Text>
+      {!hideTopBadge && !interactivePainting && (
+        <View style={styles.topBadgeContainer} pointerEvents="none">
+          <View style={styles.orientationBadge}>
+            <Compass size={14} color="#22d3ee" style={{ marginRight: 6 }} />
+            <Text style={styles.orientationText}>
+              White on top <Text style={{ color: '#22d3ee' }}>·</Text> Green facing you
+            </Text>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Moving Layer Pulsing Chip Overlay */}
       {movingChip && movingChip.visible && (
@@ -308,48 +318,50 @@ export const Cube3DView: React.FC<Cube3DViewProps> = ({
       )}
 
       {/* Bottom Corner Controls: Reset View & Auto View */}
-      <View style={styles.controlsRow}>
-        <TouchableOpacity
-          style={[
-            styles.viewButton,
-            autoViewMode !== 'off' && { borderColor: '#22d3ee', backgroundColor: 'rgba(34,211,238,0.15)' },
-          ]}
-          onPress={cycleAutoView}
-          activeOpacity={0.7}
-        >
-          <Eye size={16} color={autoViewMode !== 'off' ? '#22d3ee' : '#94A3B8'} />
-          <Text
-            style={[
-              styles.viewButtonText,
-              { color: autoViewMode !== 'off' ? '#22d3ee' : '#94A3B8' },
-            ]}
-          >
-            Auto view: {autoViewMode === 'minimal' ? 'Minimal' : autoViewMode === 'always' ? 'Always' : 'Off'}
-          </Text>
-        </TouchableOpacity>
-
-        {unified && (
+      {!hideControls && !interactivePainting && (
+        <View style={styles.controlsRow}>
           <TouchableOpacity
-            style={styles.viewButton}
-            onPress={handleBestView}
-            accessibilityRole="button"
-            accessibilityLabel="Best view"
+            style={[
+              styles.viewButton,
+              autoViewMode !== 'off' && { borderColor: '#22d3ee', backgroundColor: 'rgba(34,211,238,0.15)' },
+            ]}
+            onPress={cycleAutoView}
             activeOpacity={0.7}
           >
-            <Compass size={16} color="#22d3ee" />
-            <Text style={styles.viewButtonText}>Best view</Text>
+            <Eye size={16} color={autoViewMode !== 'off' ? '#22d3ee' : '#94A3B8'} />
+            <Text
+              style={[
+                styles.viewButtonText,
+                { color: autoViewMode !== 'off' ? '#22d3ee' : '#94A3B8' },
+              ]}
+            >
+              Auto view: {autoViewMode === 'minimal' ? 'Minimal' : autoViewMode === 'always' ? 'Always' : 'Off'}
+            </Text>
           </TouchableOpacity>
-        )}
 
-        <TouchableOpacity
-          style={styles.viewButton}
-          onPress={handleResetView}
-          activeOpacity={0.7}
-        >
-          <RotateCcw size={16} color="#94A3B8" />
-          <Text style={styles.viewButtonText}>Reset view</Text>
-        </TouchableOpacity>
-      </View>
+          {unified && (
+            <TouchableOpacity
+              style={styles.viewButton}
+              onPress={handleBestView}
+              accessibilityRole="button"
+              accessibilityLabel="Best view"
+              activeOpacity={0.7}
+            >
+              <Compass size={16} color="#22d3ee" />
+              <Text style={styles.viewButtonText}>Best view</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={styles.viewButton}
+            onPress={handleResetView}
+            activeOpacity={0.7}
+          >
+            <RotateCcw size={16} color="#94A3B8" />
+            <Text style={styles.viewButtonText}>Reset view</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };

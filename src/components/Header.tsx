@@ -102,12 +102,12 @@ export function Header({
           accessibilityLabel="Go to Home"
           activeOpacity={0.8}
         >
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title} numberOfLines={1}>{title}</Text>
           <MiniCubeBadge size={28} />
           {subtitle && (
             <>
               <Text style={styles.divider}>|</Text>
-              <Text style={styles.subtitle}>{subtitle}</Text>
+              <Text style={styles.subtitle} numberOfLines={1} ellipsizeMode="tail">{subtitle}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -148,32 +148,40 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   leftRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    minWidth: 0,
+    marginRight: 8,
   },
   logoRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    minWidth: 0,
   },
   title: {
     color: '#FFFFFF',
     fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.3,
+    flexShrink: 0,
   },
   divider: {
     color: 'rgba(165, 243, 252, 0.4)',
     fontSize: 18,
     fontWeight: '300',
     marginHorizontal: 4,
+    flexShrink: 0,
   },
   subtitle: {
     color: '#67E8F9',
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: 0.1,
+    flexShrink: 1,
   },
   actions: {
     flexDirection: 'row',

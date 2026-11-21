@@ -69,9 +69,16 @@ export function ColorPalette({
 
               {/* Color Name & Count */}
               <View style={styles.pillTextCol}>
-                <Text style={styles.gridPillName} numberOfLines={1}>
-                  {info.name.split(' ')[0]}
-                </Text>
+                <View style={styles.pillNameRow}>
+                  <Text style={styles.gridPillName} numberOfLines={1}>
+                    {info.name.split(' ')[0]}
+                  </Text>
+                  {isSelected && (
+                    <View style={styles.inlineCheckBadge}>
+                      <Check color="#02242C" size={10} strokeWidth={3.5} />
+                    </View>
+                  )}
+                </View>
                 <Text
                   style={[
                     styles.gridPillCount,
@@ -82,15 +89,6 @@ export function ColorPalette({
                   {count}/{expectedCountPerColor}
                 </Text>
               </View>
-
-              {/* Selected / Complete Checkmark Badge */}
-              {isSelected ? (
-                <View style={styles.selectedCheckBadge}>
-                  <Check color="#02242C" size={12} strokeWidth={3.5} />
-                </View>
-              ) : isComplete ? (
-                <View style={styles.completeDot} />
-              ) : null}
             </TouchableOpacity>
           );
         })}
@@ -229,17 +227,30 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     justifyContent: 'center',
   },
+  pillNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
   gridPillName: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.2,
   },
+  inlineCheckBadge: {
+    width: 15,
+    height: 15,
+    borderRadius: 7.5,
+    backgroundColor: '#22D3EE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   gridPillCount: {
     color: '#94A3B8',
     fontSize: 11,
     fontWeight: '600',
-    marginTop: 1,
+    marginTop: 2,
   },
   gridPillCountComplete: {
     color: '#34D399',
@@ -248,22 +259,6 @@ const styles = StyleSheet.create({
   gridPillCountOver: {
     color: '#F87171',
     fontWeight: '700',
-  },
-  selectedCheckBadge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#22D3EE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 4,
-  },
-  completeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#34D399',
-    marginRight: 4,
   },
 
   /* Horizontal Scroll Layout */

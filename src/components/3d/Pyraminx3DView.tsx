@@ -241,42 +241,44 @@ export const Pyraminx3DView: React.FC<Pyraminx3DViewProps> = ({
       )}
 
       {/* Floating View Controls */}
-      <View style={styles.controlsOverlay} pointerEvents="box-none">
-        {onAutoViewModeChange && (
-          <TouchableOpacity
-            style={styles.controlPill}
-            onPress={cycleAutoView}
-            accessibilityRole="button"
-            accessibilityLabel={`Auto view mode: ${autoViewMode}`}
-          >
-            <Eye color="#38BDF8" size={14} />
-            <Text style={styles.pillText}>
-              Auto view: {autoViewMode === 'always' ? 'Always' : autoViewMode === 'minimal' ? 'Minimal' : 'Off'}
-            </Text>
-          </TouchableOpacity>
-        )}
+      {!interactivePainting && (
+        <View style={styles.controlsOverlay} pointerEvents="box-none">
+          {onAutoViewModeChange && (
+            <TouchableOpacity
+              style={styles.controlPill}
+              onPress={cycleAutoView}
+              accessibilityRole="button"
+              accessibilityLabel={`Auto view mode: ${autoViewMode}`}
+            >
+              <Eye color="#38BDF8" size={14} />
+              <Text style={styles.pillText}>
+                Auto view: {autoViewMode === 'always' ? 'Always' : autoViewMode === 'minimal' ? 'Minimal' : 'Off'}
+              </Text>
+            </TouchableOpacity>
+          )}
 
-        {unified && (
-          <TouchableOpacity
-            style={styles.controlPill}
-            onPress={handleBestView}
-            accessibilityRole="button"
-            accessibilityLabel="Best view"
-          >
-            <Compass color="#22d3ee" size={14} />
-            <Text style={[styles.pillText, { color: '#22d3ee' }]}>Best view</Text>
-          </TouchableOpacity>
-        )}
+          {unified && (
+            <TouchableOpacity
+              style={styles.controlPill}
+              onPress={handleBestView}
+              accessibilityRole="button"
+              accessibilityLabel="Best view"
+            >
+              <Compass color="#22d3ee" size={14} />
+              <Text style={[styles.pillText, { color: '#22d3ee' }]}>Best view</Text>
+            </TouchableOpacity>
+          )}
 
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={handleResetView}
-          accessibilityRole="button"
-          accessibilityLabel="Reset camera view"
-        >
-          <RotateCcw color="#94A3B8" size={16} />
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={handleResetView}
+            accessibilityRole="button"
+            accessibilityLabel="Reset camera view"
+          >
+            <RotateCcw color="#94A3B8" size={16} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Dev Overlay in development mode when ?debug=1 */}
       {isDebug && devInfo && autoViewMode !== 'off' && (
