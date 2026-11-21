@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, BackHandler } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -145,6 +145,28 @@ function LearnContent() {
   const notations = content?.notations ?? [];
   const tips = content?.tips ?? [];
 
+  const handleBack = () => {
+    try {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/');
+      }
+    } catch {
+      router.replace('/');
+    }
+  };
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        handleBack();
+        return true;
+      });
+      return () => sub.remove();
+    }
+  }, []);
+
   return (
     <AquaticBackground>
       <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]} edges={['top', 'left', 'right']}>
@@ -152,9 +174,10 @@ function LearnContent() {
       <View style={[styles.navHeader, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleBack}
           accessibilityRole="button"
           accessibilityLabel="Back"
+          hitSlop={Platform.OS !== 'web' ? { top: 12, bottom: 12, left: 12, right: 12 } : undefined}
         >
           <ArrowLeft color={theme.text} size={22} />
         </TouchableOpacity>

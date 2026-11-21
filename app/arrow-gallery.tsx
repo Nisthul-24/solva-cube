@@ -143,7 +143,21 @@ export default function ArrowGalleryScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            try {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/');
+              }
+            } catch {
+              router.replace('/');
+            }
+          }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
           <ArrowLeft size={20} color="#F8FAFC" />
         </TouchableOpacity>
         <View style={styles.headerTitleWrap}>

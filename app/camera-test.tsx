@@ -82,7 +82,21 @@ export default function CameraTestScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            try {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/');
+              }
+            } catch {
+              router.replace('/');
+            }
+          }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
           <ArrowLeft color="#F8FAFC" size={22} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Dev Camera Classifier Tester</Text>

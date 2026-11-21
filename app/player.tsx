@@ -369,11 +369,24 @@ export default function SolutionPlayerScreen() {
     ? controllerState === 'camera' || controllerState === 'waiting' || controllerState === 'turning'
     : isPlaying;
 
+  // Screen Back navigation helper (fallback to /input if history empty)
+  const handleScreenBack = () => {
+    try {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/input');
+      }
+    } catch {
+      router.replace('/input');
+    }
+  };
+
   // Android BackHandler: navigating back from Player routes to Setup (/input)
   useEffect(() => {
     if (Platform.OS === 'android') {
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-        router.replace('/input');
+        handleScreenBack();
         return true;
       });
       return () => sub.remove();
@@ -546,9 +559,10 @@ export default function SolutionPlayerScreen() {
       <View style={styles.navHeader}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleScreenBack}
           accessibilityRole="button"
           accessibilityLabel="Go back"
+          hitSlop={Platform.OS !== 'web' ? { top: 12, bottom: 12, left: 12, right: 12 } : undefined}
         >
           <ArrowLeft color="#F8FAFC" size={22} />
         </TouchableOpacity>

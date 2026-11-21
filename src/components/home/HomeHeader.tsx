@@ -44,6 +44,7 @@ export function HomeHeader({ scrolled = false }: HomeHeaderProps) {
             accessibilityRole="button"
             accessibilityLabel="Help and guide"
             activeOpacity={0.7}
+            hitSlop={Platform.OS !== 'web' ? { top: 10, bottom: 10, left: 10, right: 10 } : undefined}
           >
             <HelpCircle color={HOME_THEME.textMuted} size={22} strokeWidth={2} />
           </TouchableOpacity>
@@ -54,6 +55,7 @@ export function HomeHeader({ scrolled = false }: HomeHeaderProps) {
             accessibilityRole="button"
             accessibilityLabel="Settings"
             activeOpacity={0.7}
+            hitSlop={Platform.OS !== 'web' ? { top: 10, bottom: 10, left: 10, right: 10 } : undefined}
           >
             <Settings color={HOME_THEME.textMuted} size={22} strokeWidth={2} />
           </TouchableOpacity>

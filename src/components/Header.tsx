@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Settings, HelpCircle, ArrowLeft } from 'lucide-react-native';
 import Svg, { Polygon, G, Line } from 'react-native-svg';
@@ -76,9 +76,19 @@ export function Header({
     if (onBack) {
       onBack();
     } else {
-      router.back();
+      try {
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/');
+        }
+      } catch {
+        router.replace('/');
+      }
     }
   };
+
+  const hitSlop = Platform.OS !== 'web' ? { top: 12, bottom: 12, left: 12, right: 12 } : undefined;
 
   return (
     <View style={styles.container}>
@@ -90,6 +100,7 @@ export function Header({
             accessibilityRole="button"
             accessibilityLabel="Go back"
             activeOpacity={0.8}
+            hitSlop={hitSlop}
           >
             <ArrowLeft color="#FFFFFF" size={20} />
           </TouchableOpacity>
@@ -120,6 +131,7 @@ export function Header({
           accessibilityRole="button"
           accessibilityLabel="Learn notation and guide"
           activeOpacity={0.8}
+          hitSlop={hitSlop}
         >
           <HelpCircle color="#A5F3FC" size={20} />
         </TouchableOpacity>
@@ -130,6 +142,7 @@ export function Header({
           accessibilityRole="button"
           accessibilityLabel="Settings"
           activeOpacity={0.8}
+          hitSlop={hitSlop}
         >
           <Settings color="#A5F3FC" size={20} />
         </TouchableOpacity>

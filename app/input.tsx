@@ -204,16 +204,41 @@ export default function InputScreen() {
   const [showNetOverview, setShowNetOverview] = useState(false);
   const [showCameraScanner, setShowCameraScanner] = useState(false);
 
-  // Android BackHandler: navigating back from Setup goes to Home screen
+  // Safe back navigation helper (closes modals first, falls back to Home)
+  const handleBack = () => {
+    if (showCameraScanner) {
+      setShowCameraScanner(false);
+      return;
+    }
+    if (showNetOverview) {
+      setShowNetOverview(false);
+      return;
+    }
+    if (showUnlock4x4Modal) {
+      setShowUnlock4x4Modal(false);
+      return;
+    }
+    try {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/');
+      }
+    } catch {
+      router.replace('/');
+    }
+  };
+
+  // Android BackHandler: navigating back from Setup closes modals or goes to Home screen
   useEffect(() => {
     if (Platform.OS === 'android') {
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-        router.replace('/');
+        handleBack();
         return true;
       });
       return () => sub.remove();
     }
-  }, [router]);
+  }, [showCameraScanner, showNetOverview, showUnlock4x4Modal]);
 
   const wizardSteps = activePuzzleId === 'pyraminx' ? PYRAMINX_WIZARD_FACES : WIZARD_FACES;
   const currentStep = wizardSteps[wizardStepIdx] || wizardSteps[0];
@@ -333,7 +358,7 @@ export default function InputScreen() {
           activeFace={activeFace as FaceName3x3 | null}
           isAnimating={false}
           turnDurationMs={1200}
-          autoViewMode={mode === 'guided' ? 'always' : 'off'}
+          autoViewMode={autoViewMode}
           highlightStrength={highlightStrength}
           showColorBlindLetters={showColorBlindLetters}
           isSolved={false}
@@ -542,7 +567,7 @@ export default function InputScreen() {
     <AquaticBackground>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
         {/* Top Header */}
-        <Header showBack={true} subtitle={`${puzzle.name} Setup`} />
+        <Header showBack={true} onBack={handleBack} subtitle={`${puzzle.name} Setup`} />
 
         {isWide ? (
           /* Landscape / Tablet Layout */
