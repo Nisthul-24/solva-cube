@@ -38,6 +38,7 @@ interface Cube3DViewProps {
   onCameraMoveComplete?: () => void;
   onAutoViewModeChange?: (mode: AutoViewOption) => void;
   onStickerClick?: (face: FaceName3x3, stickerIndex: number) => void;
+  onSwitchToNet?: () => void;
   style?: any;
 }
 
@@ -61,6 +62,7 @@ export const Cube3DView: React.FC<Cube3DViewProps> = ({
   onCameraMoveComplete,
   onAutoViewModeChange,
   onStickerClick,
+  onSwitchToNet,
   style,
 }) => {
   const storeHighlightStyle = useSettingsStore((s) => s.highlightStyle);
@@ -177,7 +179,7 @@ export const Cube3DView: React.FC<Cube3DViewProps> = ({
 
       {/* 3D Canvas */}
       <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers}>
-        <CanvasErrorBoundary onResetCamera={handleResetView}>
+        <CanvasErrorBoundary onResetCamera={handleResetView} onSwitchToNet={onSwitchToNet}>
           <ThreeCanvas
             style={styles.canvas}
             frameloop={isAnimating ? 'always' : 'demand'}

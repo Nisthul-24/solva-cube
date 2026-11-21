@@ -660,6 +660,7 @@ export default function SolutionPlayerScreen() {
               onAnimationComplete={handleAnimationComplete}
               onCameraMoveComplete={handleCameraMoveComplete}
               onAutoViewModeChange={setAutoViewMode}
+              onSwitchToNet={() => setShowNetOverview(true)}
             />
           ) : (
             <Pyraminx3DView
@@ -674,6 +675,7 @@ export default function SolutionPlayerScreen() {
               onAnimationComplete={handleAnimationComplete}
               onCameraMoveComplete={handleCameraMoveComplete}
               onAutoViewModeChange={setAutoViewMode}
+              onSwitchToNet={() => setShowNetOverview(true)}
             />
           )}
         </View>

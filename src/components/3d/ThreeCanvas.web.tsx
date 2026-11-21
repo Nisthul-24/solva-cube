@@ -1,17 +1,18 @@
 import React from 'react';
 import { Canvas } from '@react-three/fiber';
+import { StyleSheet } from 'react-native';
 
-export const ThreeCanvas: React.FC<any> = ({ children, style, gl, onCreated, ...props }) => {
+export const ThreeCanvas: React.FC<any> = ({ children, style, ...props }) => {
+  const flatStyle = StyleSheet.flatten(style) || {};
   return (
     <Canvas
-      style={[{ backgroundColor: 'transparent' }, style]}
-      gl={{ alpha: true, ...gl }}
-      onCreated={(state: any) => {
-        try {
-          state.gl.setClearColor(0x000000, 0);
-        } catch {}
-        if (onCreated) onCreated(state);
+      style={{
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'transparent',
+        ...flatStyle,
       }}
+      gl={{ alpha: true }}
       {...props}
     >
       {children}

@@ -34,6 +34,7 @@ interface Pyraminx3DViewProps {
   onCameraMoveComplete?: () => void;
   onAutoViewModeChange?: (mode: AutoViewOption) => void;
   onStickerClick?: (face: FaceNamePyraminx, stickerIndex: number) => void;
+  onSwitchToNet?: () => void;
   style?: any;
 }
 
@@ -62,6 +63,7 @@ export const Pyraminx3DView: React.FC<Pyraminx3DViewProps> = ({
   onCameraMoveComplete,
   onAutoViewModeChange,
   onStickerClick,
+  onSwitchToNet,
   style,
 }) => {
   const storeHighlightStyle = useSettingsStore((s) => s.highlightStyle);
@@ -166,7 +168,7 @@ export const Pyraminx3DView: React.FC<Pyraminx3DViewProps> = ({
 
   return (
     <View style={[styles.container, style]} {...panResponder.panHandlers}>
-      <CanvasErrorBoundary onResetCamera={handleResetView}>
+      <CanvasErrorBoundary onResetCamera={handleResetView} onSwitchToNet={onSwitchToNet}>
         <ThreeCanvas
           style={styles.canvas}
           camera={{ fov: 32 }}

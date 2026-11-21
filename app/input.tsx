@@ -341,6 +341,7 @@ export default function InputScreen() {
           activeStickerCursor={activeStickerCursor}
           onStickerClick={handlePaintSticker as any}
           onAutoViewModeChange={setAutoViewMode}
+          onSwitchToNet={() => setShowNetOverview(true)}
         />
       ) : (
         <Pyraminx3DView
@@ -353,6 +354,7 @@ export default function InputScreen() {
           offendingStickers={solveError?.offendingStickers as any}
           onStickerClick={handlePaintSticker as any}
           onAutoViewModeChange={setAutoViewMode}
+          onSwitchToNet={() => setShowNetOverview(true)}
         />
       )}
     </View>

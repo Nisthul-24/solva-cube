@@ -39,7 +39,7 @@ export class CanvasErrorBoundary extends Component<Props, State> {
           <AlertTriangle size={36} color="#22d3ee" style={styles.icon} />
           <Text style={styles.title}>Couldn't update 3D view</Text>
           <Text style={styles.subtitle}>
-            A 3D rendering or GL context error occurred.
+            {this.state.error?.message || 'A 3D rendering or GL context error occurred.'}
           </Text>
           <View style={styles.buttonRow}>
             <TouchableOpacity
