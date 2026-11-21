@@ -41,6 +41,7 @@ import { adController } from '../src/ads/adController';
 import { hapticFeedback } from '../src/services/hapticsService';
 import { OPEN_SOURCE_LICENSES } from '../src/constants/licensesData';
 import { PRIVACY_POLICY_URL } from '../src/constants/links';
+import { AquaticBackground } from '../src/components/common/AquaticBackground';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -85,7 +86,8 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg }]} edges={['top', 'left', 'right']}>
+    <AquaticBackground>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={[styles.navHeader, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
         <TouchableOpacity
@@ -513,6 +515,7 @@ export default function SettingsScreen() {
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
+  </AquaticBackground>
   );
 }
 

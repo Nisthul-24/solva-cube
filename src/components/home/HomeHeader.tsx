@@ -16,8 +16,8 @@ export function HomeHeader({ scrolled = false }: HomeHeaderProps) {
       style={[
         styles.wrapper,
         {
-          backgroundColor: HOME_THEME.bg,
-          borderBottomColor: scrolled ? HOME_THEME.border : 'transparent',
+          backgroundColor: scrolled ? 'rgba(4, 42, 54, 0.92)' : 'transparent',
+          borderBottomColor: scrolled ? 'rgba(34, 211, 238, 0.28)' : 'transparent',
           borderBottomWidth: 1,
         },
       ]}

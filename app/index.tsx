@@ -14,6 +14,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AquaticBackground } from '../src/components/common/AquaticBackground';
 import { ChevronRight, PlayCircle, X } from 'lucide-react-native';
 import { HomeHeader } from '../src/components/home/HomeHeader';
 import { HomePuzzleRow, HomePuzzleItem } from '../src/components/home/HomePuzzleRow';
@@ -173,9 +174,10 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      {/* Header stays fixed; content scrolls beneath it with solid opaque background */}
-      <HomeHeader scrolled={isScrolled} />
+    <AquaticBackground>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        {/* Header stays fixed; content scrolls beneath it */}
+        <HomeHeader scrolled={isScrolled} />
 
       <ScrollView
         style={styles.scrollView}
@@ -280,17 +282,18 @@ export default function HomeScreen() {
         <BannerAdView />
       </View>
     </SafeAreaView>
+  </AquaticBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: HOME_THEME.bg,
+    backgroundColor: 'transparent',
   },
   scrollView: {
     flex: 1,
-    backgroundColor: HOME_THEME.bg,
+    backgroundColor: 'transparent',
   },
   scrollContent: {
     paddingHorizontal: 16,

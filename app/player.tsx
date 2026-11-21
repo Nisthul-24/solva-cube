@@ -33,6 +33,7 @@ import { Pyraminx3DView } from '../src/components/3d/Pyraminx3DView';
 import { NetView2x2 } from '../src/components/NetView2x2';
 import { NetViewPyraminx } from '../src/components/NetViewPyraminx';
 import { PuzzleNet } from '../src/components/PuzzleNet';
+import { AquaticBackground } from '../src/components/common/AquaticBackground';
 import { ConfettiOverlay } from '../src/components/ConfettiOverlay';
 import { usePuzzleStore } from '../src/store/puzzleStore';
 import {
@@ -539,7 +540,8 @@ export default function SolutionPlayerScreen() {
   }, [currentMoveIndex]);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0b1120' }]} edges={['top', 'left', 'right']}>
+    <AquaticBackground>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]} edges={['top', 'left', 'right']}>
       {/* Top Header with Gear Settings Button (Requirement 6) */}
       <View style={styles.navHeader}>
         <TouchableOpacity
@@ -969,6 +971,7 @@ export default function SolutionPlayerScreen() {
         />
       )}
     </SafeAreaView>
+  </AquaticBackground>
   );
 }
 

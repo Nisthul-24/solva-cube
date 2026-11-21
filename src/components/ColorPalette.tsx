@@ -11,6 +11,7 @@ interface ColorPaletteProps {
   onSelectColor: (color: PuzzleColor) => void;
   colorCounts: Record<PuzzleColor, number>;
   expectedCountPerColor: number;
+  layout?: 'grid' | 'horizontal';
 }
 
 export function ColorPalette({
@@ -19,18 +20,87 @@ export function ColorPalette({
   onSelectColor,
   colorCounts,
   expectedCountPerColor,
+  layout = 'grid',
 }: ColorPaletteProps) {
   const isDarkMode = useSettingsStore((s) => s.isDarkMode);
   const isColorBlind = useSettingsStore((s) => s.isColorBlindMode);
   const colorMap = isColorBlind ? COLORBLIND_COLORS : STANDARD_COLORS;
   const theme = isDarkMode ? UI_COLORS.dark : UI_COLORS.light;
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
-      <Text style={[styles.label, { color: theme.textSecondary }]}>
-        Tap a colour, then tap stickers to paint:
-      </Text>
+  if (layout === 'grid') {
+    // 2-column grid of glossy horizontal pills as shown in the mockup
+    return (
+      <View style={styles.gridContainer}>
+        {availableColors.map((color) => {
+          const isSelected = color === selectedColor;
+          const info = colorMap[color];
+          const count = colorCounts[color] || 0;
+          const isComplete = count === expectedCountPerColor;
+          const isOver = count > expectedCountPerColor;
 
+          return (
+            <TouchableOpacity
+              key={color}
+              style={[
+                styles.gridPill,
+                isSelected && styles.gridPillSelected,
+              ]}
+              onPress={() => onSelectColor(color)}
+              accessibilityRole="button"
+              accessibilityLabel={`${info.name}, ${count} of ${expectedCountPerColor}`}
+              activeOpacity={0.8}
+            >
+              {/* 3D Glossy Color Gem */}
+              <View
+                style={[
+                  styles.glossyGem,
+                  { backgroundColor: info.hex },
+                  color === 'white' && styles.whiteGemBorder,
+                ]}
+              >
+                {/* Specular curved highlight sheen on gem */}
+                <View style={styles.gemGlossSheen} />
+                {isColorBlind && (
+                  <Text style={[styles.swatchLetter, { color: info.contrastText }]}>
+                    {info.letter}
+                  </Text>
+                )}
+              </View>
+
+              {/* Color Name & Count */}
+              <View style={styles.pillTextCol}>
+                <Text style={styles.gridPillName} numberOfLines={1}>
+                  {info.name.split(' ')[0]}
+                </Text>
+                <Text
+                  style={[
+                    styles.gridPillCount,
+                    isComplete && styles.gridPillCountComplete,
+                    isOver && styles.gridPillCountOver,
+                  ]}
+                >
+                  {count}/{expectedCountPerColor}
+                </Text>
+              </View>
+
+              {/* Selected / Complete Checkmark Badge */}
+              {isSelected ? (
+                <View style={styles.selectedCheckBadge}>
+                  <Check color="#02242C" size={12} strokeWidth={3.5} />
+                </View>
+              ) : isComplete ? (
+                <View style={styles.completeDot} />
+              ) : null}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  }
+
+  // Fallback Horizontal Scroll List
+  return (
+    <View style={styles.horizontalContainer}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -48,64 +118,44 @@ export function ColorPalette({
               key={color}
               style={[
                 styles.colorCard,
-                { backgroundColor: theme.card, borderColor: isSelected ? theme.primary : theme.border },
                 isSelected && styles.colorCardSelected,
               ]}
               onPress={() => onSelectColor(color)}
               accessibilityRole="button"
               accessibilityLabel={`${info.name}, ${count} of ${expectedCountPerColor}`}
+              activeOpacity={0.8}
             >
               <View
                 style={[
-                  styles.swatch,
-                  { backgroundColor: info.hex, borderColor: isDarkMode ? '#475569' : '#CBD5E1' },
+                  styles.glossyGem,
+                  { backgroundColor: info.hex },
+                  color === 'white' && styles.whiteGemBorder,
                 ]}
               >
+                <View style={styles.gemGlossSheen} />
                 {isColorBlind && (
                   <Text style={[styles.swatchLetter, { color: info.contrastText }]}>
                     {info.letter}
                   </Text>
                 )}
                 {isSelected && !isColorBlind && (
-                  <Check color={info.contrastText} size={16} strokeWidth={3} />
+                  <Check color={info.contrastText} size={15} strokeWidth={3} />
                 )}
               </View>
 
-              <Text style={[styles.colorName, { color: theme.text }]}>
+              <Text style={styles.colorName} numberOfLines={1}>
                 {info.name.split(' ')[0]}
               </Text>
 
-              <View style={styles.badgeRow}>
-                {isOver ? (
-                  <View style={[styles.countBadge, { backgroundColor: theme.error + '20' }]}>
-                    <AlertTriangle color={theme.error} size={11} style={{ marginRight: 2 }} />
-                    <Text style={[styles.countText, { color: theme.error, fontWeight: '700' }]}>
-                      {count}/{expectedCountPerColor}
-                    </Text>
-                  </View>
-                ) : (
-                  <View
-                    style={[
-                      styles.countBadge,
-                      {
-                        backgroundColor: isComplete ? theme.success + '20' : theme.surfaceHover,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.countText,
-                        {
-                          color: isComplete ? theme.success : theme.textSecondary,
-                          fontWeight: isComplete ? '700' : '500',
-                        },
-                      ]}
-                    >
-                      {count}/{expectedCountPerColor}
-                    </Text>
-                  </View>
-                )}
-              </View>
+              <Text
+                style={[
+                  styles.countText,
+                  isComplete && styles.gridPillCountComplete,
+                  isOver && styles.gridPillCountOver,
+                ]}
+              >
+                {count}/{expectedCountPerColor}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -115,68 +165,144 @@ export function ColorPalette({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingVertical: 10,
-    borderTopWidth: 1,
+  /* Grid Layout (2-columns matching screenshot) */
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
   },
-  label: {
-    fontSize: 12,
+  gridPill: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(6, 48, 60, 0.6)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(34, 211, 238, 0.22)',
+    borderRadius: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  gridPillSelected: {
+    backgroundColor: 'rgba(8, 64, 82, 0.85)',
+    borderColor: '#22D3EE',
+    shadowColor: '#22D3EE',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  glossyGem: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.35,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  whiteGemBorder: {
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  gemGlossSheen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '42%',
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  swatchLetter: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  pillTextCol: {
+    flex: 1,
+    marginLeft: 8,
+    justifyContent: 'center',
+  },
+  gridPillName: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  gridPillCount: {
+    color: '#94A3B8',
+    fontSize: 11,
     fontWeight: '600',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginTop: 1,
+  },
+  gridPillCountComplete: {
+    color: '#34D399',
+    fontWeight: '700',
+  },
+  gridPillCountOver: {
+    color: '#F87171',
+    fontWeight: '700',
+  },
+  selectedCheckBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#22D3EE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+  completeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#34D399',
+    marginRight: 4,
+  },
+
+  /* Horizontal Scroll Layout */
+  horizontalContainer: {
+    paddingVertical: 4,
   },
   scrollList: {
-    paddingHorizontal: 12,
-    gap: 10,
+    paddingHorizontal: 4,
+    gap: 8,
   },
   colorCard: {
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 14,
+    backgroundColor: 'rgba(6, 48, 60, 0.6)',
     borderWidth: 1.5,
-    minWidth: 68,
+    borderColor: 'rgba(34, 211, 238, 0.22)',
+    borderRadius: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    minWidth: 64,
   },
   colorCardSelected: {
-    transform: [{ scale: 1.05 }],
-  },
-  swatch: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  swatchLetter: {
-    fontSize: 14,
-    fontWeight: '800',
+    backgroundColor: 'rgba(8, 64, 82, 0.85)',
+    borderColor: '#22D3EE',
+    shadowColor: '#22D3EE',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 4,
   },
   colorName: {
+    color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  countBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    fontWeight: '700',
+    marginTop: 4,
   },
   countText: {
-    fontSize: 11,
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 1,
   },
 });
-

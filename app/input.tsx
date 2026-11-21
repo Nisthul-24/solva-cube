@@ -22,21 +22,17 @@ import {
   Compass,
   Layers,
   X,
-  ToggleLeft,
-  ToggleRight,
-  Maximize2,
-  Settings,
   Camera,
+  Eye,
 } from 'lucide-react-native';
+import Svg, { Rect, Path } from 'react-native-svg';
 import { CameraScannerModal } from '../src/camera/CameraScannerModal';
 import { Header } from '../src/components/Header';
 import { ColorPalette } from '../src/components/ColorPalette';
 import { Cube3DView } from '../src/components/3d/Cube3DView';
 import { Pyraminx3DView } from '../src/components/3d/Pyraminx3DView';
-import { NetView3x3 } from '../src/components/NetView3x3';
-import { NetView2x2 } from '../src/components/NetView2x2';
-import { NetViewPyraminx } from '../src/components/NetViewPyraminx';
 import { PuzzleNet } from '../src/components/PuzzleNet';
+import { AquaticBackground } from '../src/components/common/AquaticBackground';
 import { adController } from '../src/ads/adController';
 import { nativeAdAdapter } from '../src/ads/nativeAdAdapter';
 import { usePuzzleStore } from '../src/store/puzzleStore';
@@ -46,7 +42,6 @@ import { getPuzzle } from '../src/solvers';
 import { PuzzleColor, CubeColor } from '../src/types/puzzle';
 import { hapticFeedback } from '../src/services/hapticsService';
 import { FaceName3x3, PALETTE } from '../src/components/3d/stickerLayout';
-import { Cube3x3State } from '../src/solvers/cube3x3/cube3x3Facelets';
 
 interface FaceStepConfig {
   face: string;
@@ -113,43 +108,67 @@ const PYRAMINX_WIZARD_FACES: FaceStepConfig[] = [
     face: 'F',
     number: 1,
     centerColor: 'green',
-    centerName: 'GREEN (Front)',
-    instruction: 'Face 1 of 4: Front face (GREEN). Hold with top vertex up and green facing you.',
-    tiltAction: 'Hold with top corner up, Green facing you directly.',
+    centerName: 'FRONT (Green)',
+    instruction: 'Face 1 of 4: point the FRONT face towards you. Paint the 9 stickers.',
+    tiltAction: 'Front face forward, Yellow at the base.',
   },
   {
     face: 'R',
     number: 2,
     centerColor: 'red',
-    centerName: 'RED (Right)',
-    instruction: 'Face 2 of 4: Right face (RED). Turn pyramid to view the red face.',
-    tiltAction: 'Turn to the right face: Red faces you.',
+    centerName: 'RIGHT (Red)',
+    instruction: 'Face 2 of 4: rotate pyramid to the left to paint the RIGHT face.',
+    tiltAction: 'Rotate left: Right face now faces you.',
   },
   {
     face: 'L',
     number: 3,
     centerColor: 'blue',
-    centerName: 'BLUE (Left)',
-    instruction: 'Face 3 of 4: Left face (BLUE). Turn pyramid to view the blue face.',
-    tiltAction: 'Turn to the left face: Blue faces you.',
+    centerName: 'LEFT (Blue)',
+    instruction: 'Face 3 of 4: rotate pyramid to the right to paint the LEFT face.',
+    tiltAction: 'Rotate right: Left face now faces you.',
   },
   {
     face: 'D',
     number: 4,
     centerColor: 'yellow',
-    centerName: 'YELLOW (Bottom)',
-    instruction: 'Face 4 of 4: Bottom base (YELLOW). Tilt the pyramid up to view the yellow base.',
-    tiltAction: 'Tilt up: Yellow base faces you.',
+    centerName: 'BOTTOM (Yellow)',
+    instruction: 'Face 4 of 4: tilt the pyramid up to paint the BOTTOM face.',
+    tiltAction: 'Tilt up: Bottom base now faces you.',
   },
 ];
 
-export default function ColourInputScreen() {
+/**
+ * Stylized Rainbow Scanner Icon for the Scan Tool
+ */
+function ScannerToolIcon({ size = 18 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      {/* Corner Brackets */}
+      <Path
+        d="M 3 7 V 4 A 1 1 0 0 1 4 3 H 7 M 17 3 H 20 A 1 1 0 0 1 21 4 V 7 M 21 17 V 20 A 1 1 0 0 1 20 21 H 17 M 7 21 H 4 A 1 1 0 0 1 3 20 V 17"
+        stroke="#E879F9"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      {/* Barcode/Scan lines */}
+      <Rect x="7" y="7" width="2" height="10" rx="1" fill="#F43F5E" />
+      <Rect x="11" y="6" width="2" height="12" rx="1" fill="#F59E0B" />
+      <Rect x="15" y="7" width="2" height="10" rx="1" fill="#22D3EE" />
+    </Svg>
+  );
+}
+
+export default function InputScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const isWide = width >= 768;
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+  const isWide = width >= 680 || isLandscape;
 
-  // Single Zustand store holding the sticker state (Requirement 1)
+  // Single Zustand store holding the sticker state
   const activePuzzleId = usePuzzleStore((s) => s.activePuzzleId);
   const currentState = usePuzzleStore((s) => s.currentState);
   const selectedColor = usePuzzleStore((s) => s.selectedColor);
@@ -171,16 +190,15 @@ export default function ColourInputScreen() {
   const showColorBlindLetters = useSettingsStore((s) => s.showColorBlindLetters);
   const adsRemoved = useSettingsStore((s) => s.adsRemoved);
   const cube4x4UnlockedUntil = useSettingsStore((s) => s.cube4x4UnlockedUntil);
-  const setAdsRemoved = useSettingsStore((s) => s.setAdsRemoved);
-  const unlock4x4For24h = useSettingsStore((s) => s.unlock4x4For24h);
   const theme = isDarkMode ? UI_COLORS.dark : UI_COLORS.light;
 
   const [showUnlock4x4Modal, setShowUnlock4x4Modal] = useState(false);
 
   const puzzle = getPuzzle(activePuzzleId);
-  const expectedCountPerColor = activePuzzleId === '4x4' ? 16 : activePuzzleId === '3x3' ? 9 : activePuzzleId === '2x2' ? 4 : 9;
+  const expectedCountPerColor =
+    activePuzzleId === '4x4' ? 16 : activePuzzleId === '3x3' ? 9 : activePuzzleId === '2x2' ? 4 : 9;
 
-  // Mode is purely a UI flag: 'guided' | 'free' (Requirement 1)
+  // Mode is purely a UI flag: 'guided' | 'free'
   const [mode, setMode] = useState<'guided' | 'free'>('guided');
   const [wizardStepIdx, setWizardStepIdx] = useState(0);
   const [showNetOverview, setShowNetOverview] = useState(false);
@@ -226,11 +244,12 @@ export default function ColourInputScreen() {
   const activeStickerCursor = useMemo(() => {
     if (activePuzzleId === 'pyraminx' || mode !== 'guided') return null;
     const stickers = currentState[currentStep.face] || [];
-    const order = activePuzzleId === '4x4'
-      ? Array.from({ length: 16 }, (_, i) => i)
-      : activePuzzleId === '2x2'
-      ? [0, 1, 2, 3]
-      : [0, 1, 2, 3, 5, 6, 7, 8];
+    const order =
+      activePuzzleId === '4x4'
+        ? Array.from({ length: 16 }, (_, i) => i)
+        : activePuzzleId === '2x2'
+        ? [0, 1, 2, 3]
+        : [0, 1, 2, 3, 5, 6, 7, 8];
     for (const idx of order) {
       if (!stickers[idx]) return idx;
     }
@@ -303,674 +322,719 @@ export default function ColourInputScreen() {
     await proceedSolveAfterUnlock();
   };
 
-  return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: '#0B1120' }]} edges={['top', 'left', 'right']}>
-      {/* Header */}
-      <Header title={`${puzzle.name} Setup`} />
+  /* Render 3D Canvas */
+  const render3DCanvas = () => (
+    <View style={styles.canvasContainer}>
+      {activePuzzleId === '3x3' || activePuzzleId === '2x2' || activePuzzleId === '4x4' ? (
+        <Cube3DView
+          key="stable-cube-3d"
+          cubeState={currentState as any}
+          dimension={activePuzzleId === '4x4' ? 4 : activePuzzleId === '2x2' ? 2 : 3}
+          activeFace={activeFace as FaceName3x3 | null}
+          isAnimating={false}
+          turnDurationMs={1200}
+          autoViewMode={mode === 'guided' ? 'always' : 'off'}
+          highlightStrength={highlightStrength}
+          showColorBlindLetters={showColorBlindLetters}
+          isSolved={false}
+          interactivePainting={true}
+          activeStickerCursor={activeStickerCursor}
+          onStickerClick={handlePaintSticker as any}
+          onAutoViewModeChange={setAutoViewMode}
+        />
+      ) : (
+        <Pyraminx3DView
+          key="stable-pyraminx-3d"
+          state={currentState as any}
+          activeFace={activeFace as any}
+          guidedMode={mode === 'guided'}
+          autoViewMode={autoViewMode}
+          showColorBlindLetters={showColorBlindLetters}
+          offendingStickers={solveError?.offendingStickers as any}
+          onStickerClick={handlePaintSticker as any}
+          onAutoViewModeChange={setAutoViewMode}
+        />
+      )}
+    </View>
+  );
 
-      <View style={isWide ? styles.wideRow : styles.mobileColumn}>
-        {/* Large 3D Stage (at least 55% of the screen height on mobile) */}
-        <View style={isWide ? styles.stageWide : styles.stageMobile}>
-          {/* Top Mode Banner & Guided/Free Toggle */}
-          <View style={styles.topOverlayRow}>
-            {mode === 'guided' && (activePuzzleId === '3x3' || activePuzzleId === '2x2') ? (
-              <View style={styles.instructionBanner}>
-                <View style={styles.instructionTitleRow}>
-                  <Compass size={14} color="#22d3ee" />
-                  <Text style={styles.instructionBannerTitle}>
-                    Face {currentStep.number} of 6: {activePuzzleId === '2x2' ? `${currentStep.face} Face` : `${currentStep.centerName} Centre`}
-                  </Text>
-                </View>
-                <Text style={styles.instructionText}>
-                  {activePuzzleId === '2x2'
-                    ? `Face ${currentStep.number} of 6: Copy the 4 colours you see on this face.`
-                    : currentStep.instruction}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.freeModeBanner}>
-                <Text style={styles.freeModeText}>
-                  Free Mode: drag to rotate, tap any sticker to paint.
-                </Text>
-              </View>
-            )}
+  /* Render Top Instruction Card */
+  const renderInstructionCard = () => (
+    <View style={styles.glassInstructionCard}>
+      <View style={styles.instructionTopRow}>
+        <View style={styles.instructionTitleBox}>
+          <Text style={styles.instructionCardTitle} numberOfLines={1}>
+            {mode === 'guided'
+              ? `Face ${currentStep.number} of ${wizardSteps.length}: ${
+                  activePuzzleId === '2x2'
+                    ? `${currentStep.face} Face`
+                    : `${currentStep.centerName} Centre`
+                }`
+              : 'Free Mode'}
+          </Text>
+        </View>
 
-            {/* Guided / Free Toggle */}
-            {(activePuzzleId === '3x3' || activePuzzleId === '2x2') && (
-              <TouchableOpacity
-                style={styles.modeToggleBtn}
-                onPress={() => setMode((prev) => (prev === 'guided' ? 'free' : 'guided'))}
-              >
-                {mode === 'guided' ? (
-                  <ToggleRight size={22} color="#22d3ee" />
-                ) : (
-                  <ToggleLeft size={22} color="#94A3B8" />
-                )}
-                <Text style={[styles.modeToggleText, mode === 'guided' && { color: '#22d3ee' }]}>
-                  {mode === 'guided' ? 'Guided' : 'Free'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* 3D Cube Canvas - Single Stable Mount (Requirement 1 & 3) */}
-          <View style={styles.canvasContainer}>
-            {activePuzzleId === '3x3' || activePuzzleId === '2x2' || activePuzzleId === '4x4' ? (
-              <Cube3DView
-                key="stable-cube-3d"
-                cubeState={currentState as any}
-                dimension={activePuzzleId === '4x4' ? 4 : activePuzzleId === '2x2' ? 2 : 3}
-                activeFace={activeFace as FaceName3x3 | null}
-                isAnimating={false}
-                turnDurationMs={1200}
-                autoViewMode={mode === 'guided' ? 'always' : 'off'}
-                highlightStrength={highlightStrength}
-                showColorBlindLetters={showColorBlindLetters}
-                isSolved={false}
-                interactivePainting={true}
-                activeStickerCursor={activeStickerCursor}
-                onStickerClick={handlePaintSticker as any}
-                onAutoViewModeChange={setAutoViewMode}
-              />
-            ) : (
-              <Pyraminx3DView
-                key="stable-pyraminx-3d"
-                state={currentState as any}
-                activeFace={activeFace as any}
-                guidedMode={mode === 'guided'}
-                autoViewMode={autoViewMode}
-                showColorBlindLetters={showColorBlindLetters}
-                offendingStickers={solveError?.offendingStickers as any}
-                onStickerClick={handlePaintSticker as any}
-                onAutoViewModeChange={setAutoViewMode}
-              />
-            )}
-          </View>
-
-          {/* Pyraminx Piece Types Legend (Requirement 1) */}
-          {activePuzzleId === 'pyraminx' && (
-            <View style={styles.pyraminxLegendBar}>
-              <View style={styles.legendItem}>
-                <View style={styles.legendDot} />
-                <Text style={styles.legendText}>Tip: dot</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={styles.legendRing} />
-                <Text style={styles.legendText}>Axial: ring</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={styles.legendPlain} />
-                <Text style={styles.legendText}>Edge: plain</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Small Corner Read-Only Flat Overview */}
+        {/* Guided / Free Sleek Pill Switch */}
+        {(activePuzzleId === '3x3' || activePuzzleId === '2x2') && (
           <TouchableOpacity
-            style={styles.miniOverviewCorner}
-            onPress={() => setShowNetOverview(true)}
+            style={styles.guidedToggleWrap}
+            onPress={() => setMode((prev) => (prev === 'guided' ? 'free' : 'guided'))}
             activeOpacity={0.8}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: mode === 'guided' }}
+            accessibilityLabel={`Toggle Guided mode, currently ${mode}`}
           >
-            <View style={styles.miniOverviewHeader}>
-              <Layers size={13} color="#22d3ee" />
-              <Text style={styles.miniOverviewTitle}>Net View</Text>
-              <Maximize2 size={11} color="#94A3B8" />
-            </View>
-          </TouchableOpacity>
-
-          {/* Narrow screen 4x4 helper banner */}
-          {activePuzzleId === '4x4' && width < 380 && (
-            <TouchableOpacity
-              style={styles.narrowScreenNetBanner}
-              onPress={() => setShowNetOverview(true)}
-              accessibilityLabel="Switch to 2D Net for larger touch targets"
+            <Text style={styles.guidedToggleLabel}>Guided</Text>
+            <View
+              style={[
+                styles.sleekSwitchTrack,
+                mode === 'guided' && styles.sleekSwitchTrackActive,
+              ]}
             >
-              <Layers size={13} color="#FFB400" />
-              <Text style={styles.narrowScreenNetText}>
-                Narrow screen: Tap here for 2D Net painting (≥28dp targets)
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Bottom Sheet: Palette, Tools & Solve Button (Requirement 3) */}
-        <View
-          style={[
-            isWide ? styles.sheetWide : styles.sheetMobile,
-            {
-              paddingBottom: Math.max(insets.bottom, 12),
-              paddingLeft: Math.max(insets.left, isWide ? 16 : 14),
-              paddingRight: Math.max(insets.right, isWide ? 16 : 14),
-            },
-          ]}
-        >
-          {/* Validation Error Banner */}
-          {solveError && (
-            <View style={styles.errorCard}>
-              <AlertCircle color="#EF4444" size={18} style={{ marginTop: 2 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.errorTitle}>{solveError.error}</Text>
-                {solveError.details ? (
-                  <Text style={styles.errorMessage}>{solveError.details}</Text>
-                ) : null}
-              </View>
+              <View
+                style={[
+                  styles.sleekSwitchThumb,
+                  mode === 'guided' && styles.sleekSwitchThumbActive,
+                ]}
+              />
             </View>
-          )}
-
-          {/* Color Palette with Live Counts */}
-          <View style={styles.paletteContainer}>
-            <Text style={styles.paletteHeading}>Paint Palette:</Text>
-            <ColorPalette
-              availableColors={puzzle.colors}
-              selectedColor={selectedColor}
-              onSelectColor={(c) => {
-                hapticFeedback.light();
-                setSelectedColor(c);
-              }}
-              colorCounts={colorCounts}
-              expectedCountPerColor={expectedCountPerColor}
-            />
-          </View>
-
-          {/* Tools Row: Undo, Camera Scan, Sample Scramble, Reset */}
-          <View style={styles.toolsRow}>
-            {activePuzzleId !== 'pyraminx' && (
-              <TouchableOpacity
-                style={styles.toolBtn}
-                onPress={() => setShowCameraScanner(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Scan with Camera"
-              >
-                <Camera size={14} color="#22d3ee" />
-                <Text style={styles.toolBtnText}>Scan</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity style={styles.toolBtn} onPress={undo} accessibilityRole="button" accessibilityLabel="Undo">
-              <Undo2 size={14} color="#CBD5E1" />
-              <Text style={styles.toolBtnText}>Undo</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.toolBtn} onPress={fillSampleScramble} accessibilityRole="button" accessibilityLabel="Sample Scramble">
-              <Dices size={14} color="#22d3ee" />
-              <Text style={styles.toolBtnText}>Sample</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.toolBtn} onPress={resetState} accessibilityRole="button" accessibilityLabel="Reset">
-              <RotateCcw size={14} color="#94A3B8" />
-              <Text style={styles.toolBtnText}>Reset</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Main Solve Button */}
-          <TouchableOpacity
-            style={[
-              styles.solveButton,
-              !isComplete && styles.solveButtonDisabled,
-            ]}
-            onPress={handleSolve}
-            disabled={!isComplete || isSolving}
-            accessibilityRole="button"
-            accessibilityLabel="Check & Solve Cube"
-          >
-            {isSolving ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Play size={20} color="#FFFFFF" />
-                <Text style={styles.solveButtonText}>
-                  {isComplete ? 'Check & Solve Cube' : `Fill All Stickers (${expectedCountPerColor * puzzle.colors.length} total)`}
-                </Text>
-              </>
-            )}
           </TouchableOpacity>
-        </View>
+        )}
       </View>
 
-      {/* Read-Only Flat Net Overview Modal */}
-      <Modal
-        visible={showNetOverview}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowNetOverview(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Layers size={20} color="#22d3ee" />
-                <Text style={styles.modalTitle}>Full 2D Net Overview</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setShowNetOverview(false)}
-                style={styles.modalCloseBtn}
-              >
-                <X size={20} color="#F8FAFC" />
-              </TouchableOpacity>
-            </View>
+      <Text style={styles.instructionCardSubtitle} numberOfLines={2}>
+        {mode === 'guided'
+          ? activePuzzleId === '2x2'
+            ? `Face ${currentStep.number} of 6: Copy the 4 colours you see on this face.`
+            : currentStep.instruction
+          : 'Free Mode: drag to rotate, tap any sticker to paint.'}
+      </Text>
+    </View>
+  );
 
-            <View style={styles.netSvgBox}>
-              <PuzzleNet
-                puzzleId={activePuzzleId}
-                state={currentState as any}
-                onStickerPress={(face, idx) => {
-                  hapticFeedback.light();
-                  paintSticker(face, idx, false);
-                }}
-                readOnly={false}
-              />
-            </View>
-
-            <TouchableOpacity
-              style={styles.modalDoneBtn}
-              onPress={() => setShowNetOverview(false)}
-            >
-              <Text style={styles.modalDoneText}>Close Overview</Text>
-            </TouchableOpacity>
+  /* Render Palette & Controls (Sidebar in wide, Bottom Sheet in portrait) */
+  const renderPaletteAndControls = () => (
+    <View style={isWide ? styles.glassSidebarCard : styles.glassBottomSheet}>
+      {/* Validation Error Banner */}
+      {solveError && (
+        <View style={styles.errorCard}>
+          <AlertCircle color="#EF4444" size={16} style={{ marginTop: 2 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.errorTitle}>{solveError.error}</Text>
+            {solveError.details ? (
+              <Text style={styles.errorMessage}>{solveError.details}</Text>
+            ) : null}
           </View>
         </View>
-      </Modal>
+      )}
 
-      {/* 4x4 Ad / Unlock Modal on Solve */}
-      <Modal
-        visible={showUnlock4x4Modal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowUnlock4x4Modal(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={styles.modalTitle}>Unlock 4x4 Solution</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setShowUnlock4x4Modal(false)}
-                style={styles.modalCloseBtn}
-              >
-                <X size={20} color="#F8FAFC" />
-              </TouchableOpacity>
-            </View>
+      {/* Palette Header */}
+      <View style={styles.paletteHeaderRow}>
+        <Text style={styles.paletteHeading}>PAINT PALETTE:</Text>
+        <Text style={styles.paletteSubheading}>TAP A COLOUR, THEN TAP STICKERS TO PAINT:</Text>
+      </View>
 
-            <Text style={{ color: '#94A3B8', fontSize: 13, marginVertical: 12, lineHeight: 18 }}>
-              Watch a short video to unlock this 4x4 solution.
-            </Text>
-
-            <TouchableOpacity
-              style={[styles.modalDoneBtn, { backgroundColor: '#38BDF8', marginBottom: 10 }]}
-              onPress={handleWatchVideoUnlock}
-            >
-              <Text style={[styles.modalDoneText, { color: '#0F172A', fontWeight: '800' }]}>
-                Watch Video
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.modalDoneBtn, { backgroundColor: '#1E293B', marginBottom: 10 }]}
-              onPress={async () => {
-                setAdsRemoved(true);
-                await proceedSolveAfterUnlock();
-              }}
-            >
-              <Text style={[styles.modalDoneText, { color: '#F8FAFC' }]}>
-                Remove Ads ($1.99)
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.modalDoneBtn, { backgroundColor: 'transparent' }]}
-              onPress={() => setShowUnlock4x4Modal(false)}
-            >
-              <Text style={[styles.modalDoneText, { color: '#64748B' }]}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Guided Camera Scanner Modal */}
-      <CameraScannerModal
-        visible={showCameraScanner}
-        onClose={() => setShowCameraScanner(false)}
-        dimension={activePuzzleId === '4x4' ? 4 : activePuzzleId === '2x2' ? 2 : 3}
-        onScanComplete={(scanned) => {
-          setCurrentState(scanned);
+      {/* 2-Column Grid of 3D Glossy Color Pills */}
+      <ColorPalette
+        availableColors={puzzle.colors}
+        selectedColor={selectedColor}
+        onSelectColor={(c) => {
+          hapticFeedback.light();
+          setSelectedColor(c);
         }}
+        colorCounts={colorCounts}
+        expectedCountPerColor={expectedCountPerColor}
+        layout="grid"
       />
-    </SafeAreaView>
+
+      {/* 4 Tool Action Buttons in a Row (Scan, Undo, Sample, Reset) */}
+      <View style={styles.toolsRow}>
+        {activePuzzleId !== 'pyraminx' && (
+          <TouchableOpacity
+            style={styles.toolTileBtn}
+            onPress={() => setShowCameraScanner(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Scan face with camera"
+            activeOpacity={0.8}
+          >
+            <View style={[styles.toolIconCircle, { backgroundColor: 'rgba(232, 121, 249, 0.18)' }]}>
+              <ScannerToolIcon size={18} />
+            </View>
+            <Text style={styles.toolTileText}>Scan</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={styles.toolTileBtn}
+          onPress={undo}
+          accessibilityRole="button"
+          accessibilityLabel="Undo last paint"
+          activeOpacity={0.8}
+        >
+          <View style={[styles.toolIconCircle, { backgroundColor: 'rgba(16, 185, 129, 0.18)' }]}>
+            <Undo2 size={18} color="#34D399" />
+          </View>
+          <Text style={styles.toolTileText}>Undo</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.toolTileBtn}
+          onPress={fillSampleScramble}
+          accessibilityRole="button"
+          accessibilityLabel="Fill with sample scramble"
+          activeOpacity={0.8}
+        >
+          <View style={[styles.toolIconCircle, { backgroundColor: 'rgba(168, 85, 247, 0.18)' }]}>
+            <Dices size={18} color="#C084FC" />
+          </View>
+          <Text style={styles.toolTileText}>Sample</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.toolTileBtn}
+          onPress={resetState}
+          accessibilityRole="button"
+          accessibilityLabel="Reset all stickers"
+          activeOpacity={0.8}
+        >
+          <View style={[styles.toolIconCircle, { backgroundColor: 'rgba(249, 115, 22, 0.18)' }]}>
+            <RotateCcw size={18} color="#FB923C" />
+          </View>
+          <Text style={styles.toolTileText}>Reset</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Big Glossy 3D Emerald Solve Button */}
+      <TouchableOpacity
+        style={[
+          styles.glossySolveButton,
+          !isComplete && styles.glossySolveButtonDisabled,
+        ]}
+        onPress={handleSolve}
+        disabled={!isComplete || isSolving}
+        accessibilityRole="button"
+        accessibilityLabel="Check & Solve Cube"
+        activeOpacity={0.85}
+      >
+        {/* Specular curved top sheen */}
+        <View style={styles.solveSheenOverlay} />
+
+        {isSolving ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <View style={styles.solveButtonContent}>
+            <Text style={styles.glossySolveButtonText}>
+              {isComplete
+                ? 'Check & Solve Cube'
+                : `Fill All Stickers (${expectedCountPerColor * puzzle.colors.length} total)`}
+            </Text>
+            {isComplete && <Play size={17} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 6 }} />}
+          </View>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <AquaticBackground>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+        {/* Top Header */}
+        <Header showBack={true} subtitle={`${puzzle.name} Setup`} />
+
+        {isWide ? (
+          /* Landscape / Tablet Layout */
+          <View style={styles.wideRow}>
+            {/* Left Column: 3D Stage & Overlays */}
+            <View style={styles.stageWide}>
+              {/* Top Face Instruction Card */}
+              {renderInstructionCard()}
+
+              {/* Interactive 3D Canvas */}
+              {render3DCanvas()}
+
+              {/* Front orientation tag */}
+              <View style={styles.frontTagWrap}>
+                <Text style={styles.frontTagText}>Front</Text>
+              </View>
+
+              {/* Bottom Glass Pills (Auto view & Net View) */}
+              <View style={styles.stageBottomPillsRow}>
+                <TouchableOpacity
+                  style={styles.glassPill}
+                  onPress={() =>
+                    setAutoViewMode(autoViewMode === 'always' ? 'off' : 'always')
+                  }
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.glassPillText}>
+                    Auto view: <Text style={styles.glassPillHighlight}>{autoViewMode === 'always' ? 'Always' : 'Off'}</Text>
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.glassPill}
+                  onPress={() => setShowNetOverview(true)}
+                  activeOpacity={0.8}
+                >
+                  <Layers size={14} color="#22D3EE" style={{ marginRight: 6 }} />
+                  <Text style={styles.glassPillText}>Net View</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Right Column: Glass Sidebar */}
+            <View style={styles.sidebarCol}>{renderPaletteAndControls()}</View>
+          </View>
+        ) : (
+          /* Portrait Mobile Layout */
+          <ScrollView
+            style={styles.portraitScroll}
+            contentContainerStyle={styles.portraitScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.stageMobile}>
+              {renderInstructionCard()}
+              {render3DCanvas()}
+
+              <View style={styles.frontTagWrap}>
+                <Text style={styles.frontTagText}>Front</Text>
+              </View>
+
+              <View style={styles.stageBottomPillsRow}>
+                <TouchableOpacity
+                  style={styles.glassPill}
+                  onPress={() =>
+                    setAutoViewMode(autoViewMode === 'always' ? 'off' : 'always')
+                  }
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.glassPillText}>
+                    Auto view: <Text style={styles.glassPillHighlight}>{autoViewMode === 'always' ? 'Always' : 'Off'}</Text>
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.glassPill}
+                  onPress={() => setShowNetOverview(true)}
+                  activeOpacity={0.8}
+                >
+                  <Layers size={14} color="#22D3EE" style={{ marginRight: 6 }} />
+                  <Text style={styles.glassPillText}>Net View</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {renderPaletteAndControls()}
+          </ScrollView>
+        )}
+
+        {/* Read-Only Flat Net Overview Modal */}
+        <Modal
+          visible={showNetOverview}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowNetOverview(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Layers size={20} color="#22D3EE" />
+                  <Text style={styles.modalTitle}>Full 2D Net Overview</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowNetOverview(false)}
+                  style={styles.modalCloseBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close Net Overview"
+                >
+                  <X size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalBody}>
+                <PuzzleNet
+                  puzzleId={activePuzzleId}
+                  state={currentState}
+                  readOnly={true}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Camera Scanner Modal */}
+        {activePuzzleId !== 'pyraminx' && (
+          <CameraScannerModal
+            visible={showCameraScanner}
+            onClose={() => setShowCameraScanner(false)}
+            dimension={activePuzzleId === '4x4' ? 4 : activePuzzleId === '2x2' ? 2 : 3}
+            onScanComplete={(scannedState) => {
+              setCurrentState(scannedState);
+            }}
+          />
+        )}
+      </SafeAreaView>
+    </AquaticBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
-  mobileColumn: {
-    flex: 1,
-    flexDirection: 'column',
-  },
+
+  /* Wide / Landscape Layout */
   wideRow: {
     flex: 1,
     flexDirection: 'row',
-  },
-  stageMobile: {
-    height: '56%', // At least 55% of the screen (Requirement 3)
-    width: '100%',
-    backgroundColor: '#0B1120',
-    position: 'relative',
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    gap: 12,
   },
   stageWide: {
-    flex: 1.3,
+    flex: 1.25,
     height: '100%',
-    backgroundColor: '#0B1120',
+    position: 'relative',
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  sidebarCol: {
+    flex: 0.95,
+    maxWidth: 420,
+    height: '100%',
+    justifyContent: 'center',
+  },
+
+  /* Portrait Layout */
+  portraitScroll: {
+    flex: 1,
+  },
+  portraitScrollContent: {
+    paddingBottom: 24,
+  },
+  stageMobile: {
+    height: 380,
+    width: '100%',
     position: 'relative',
   },
   canvasContainer: {
     width: '100%',
     height: '100%',
   },
-  topOverlayRow: {
+
+  /* Top Frosted Glass Instruction Card */
+  glassInstructionCard: {
     position: 'absolute',
-    top: 10,
+    top: 8,
+    left: 12,
+    right: 12,
+    zIndex: 10,
+    backgroundColor: 'rgba(4, 45, 58, 0.72)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(34, 211, 238, 0.3)',
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  instructionTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  instructionTitleBox: {
+    flex: 1,
+    marginRight: 8,
+  },
+  instructionCardTitle: {
+    color: '#67E8F9',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  guidedToggleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  guidedToggleLabel: {
+    color: '#A5F3FC',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sleekSwitchTrack: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(15, 60, 75, 0.75)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(34, 211, 238, 0.35)',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  sleekSwitchTrackActive: {
+    backgroundColor: '#06B6D4',
+    borderColor: '#22D3EE',
+  },
+  sleekSwitchThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#94A3B8',
+  },
+  sleekSwitchThumbActive: {
+    backgroundColor: '#FFFFFF',
+    alignSelf: 'flex-end',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  instructionCardSubtitle: {
+    color: '#E0F2FE',
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 16,
+  },
+
+  /* Front Orientation Label */
+  frontTagWrap: {
+    position: 'absolute',
+    bottom: 46,
+    alignSelf: 'center',
+    zIndex: 8,
+  },
+  frontTagText: {
+    color: '#A5F3FC',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+
+  /* Stage Bottom Pills */
+  stageBottomPillsRow: {
+    position: 'absolute',
+    bottom: 8,
     left: 12,
     right: 12,
     zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     gap: 8,
   },
-  instructionBanner: {
-    flex: 1,
-    backgroundColor: 'rgba(21, 28, 43, 0.88)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: '#22d3ee',
-    borderWidth: 1,
-    borderColor: 'rgba(34, 211, 238, 0.25)',
-  },
-  instructionTitleRow: {
+  glassPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    backgroundColor: 'rgba(6, 48, 62, 0.65)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(34, 211, 238, 0.28)',
+    borderRadius: 16,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  instructionBannerTitle: {
-    color: '#22d3ee',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  instructionText: {
-    color: '#F8FAFC',
+  glassPillText: {
+    color: '#A5F3FC',
     fontSize: 12,
-    fontWeight: '700',
-    marginTop: 2,
+    fontWeight: '600',
   },
-  freeModeBanner: {
-    flex: 1,
-    backgroundColor: 'rgba(21, 28, 43, 0.88)',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  freeModeText: {
-    color: '#CBD5E1',
-    fontSize: 11,
-  },
-  modeToggleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-    borderWidth: 1,
-    borderColor: 'rgba(34, 211, 238, 0.3)',
-  },
-  modeToggleText: {
-    color: '#94A3B8',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  miniOverviewCorner: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.88)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(34, 211, 238, 0.3)',
-    zIndex: 10,
-  },
-  miniOverviewHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  miniOverviewTitle: {
-    color: '#22d3ee',
-    fontSize: 11,
+  glassPillHighlight: {
+    color: '#FFFFFF',
     fontWeight: '800',
   },
-  sheetMobile: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 8,
-    justifyContent: 'space-between',
+
+  /* Sidebar Card (Wide/Landscape) */
+  glassSidebarCard: {
+    backgroundColor: 'rgba(4, 42, 54, 0.72)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(34, 211, 238, 0.28)',
+    borderRadius: 22,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  sheetWide: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-    borderLeftWidth: 1,
-    borderLeftColor: 'rgba(255, 255, 255, 0.08)',
+
+  /* Bottom Sheet (Portrait) */
+  glassBottomSheet: {
+    backgroundColor: 'rgba(4, 42, 54, 0.78)',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1.5,
+    borderColor: 'rgba(34, 211, 238, 0.28)',
     padding: 16,
-    justifyContent: 'space-between',
+    marginHorizontal: 10,
+    marginTop: 8,
   },
+
+  /* Palette Header */
+  paletteHeaderRow: {
+    marginBottom: 8,
+  },
+  paletteHeading: {
+    color: '#67E8F9',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  paletteSubheading: {
+    color: '#A5F3FC',
+    fontSize: 10.5,
+    fontWeight: '600',
+    marginTop: 1,
+    letterSpacing: 0.2,
+  },
+
+  /* Tools 4-in-a-row */
+  toolsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginVertical: 12,
+  },
+  toolTileBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(6, 48, 62, 0.65)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(34, 211, 238, 0.25)',
+    borderRadius: 14,
+    paddingVertical: 7,
+  },
+  toolIconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 3,
+  },
+  toolTileText: {
+    color: '#A5F3FC',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  /* Glossy 3D Emerald Solve Button */
+  glossySolveButton: {
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#059669',
+    borderWidth: 1.5,
+    borderColor: '#34D399',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  glossySolveButtonDisabled: {
+    backgroundColor: 'rgba(6, 52, 66, 0.5)',
+    borderColor: 'rgba(34, 211, 238, 0.2)',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  solveSheenOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '45%',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  solveButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  glossySolveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+
+  /* Validation Error */
   errorCard: {
     flexDirection: 'row',
-    backgroundColor: '#7F1D1D30',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 1.2,
     borderColor: '#EF4444',
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 8,
-    marginBottom: 6,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
     gap: 8,
   },
   errorTitle: {
-    color: '#F87171',
-    fontWeight: '800',
-    fontSize: 12,
+    color: '#FCA5A5',
+    fontSize: 13,
+    fontWeight: '700',
   },
   errorMessage: {
     color: '#FECACA',
     fontSize: 11,
+    marginTop: 2,
   },
-  paletteContainer: {
-    marginBottom: 8,
-  },
-  paletteHeading: {
-    color: '#94A3B8',
-    fontSize: 11,
-    fontWeight: '700',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  toolsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 6,
-    marginBottom: 10,
-  },
-  toolBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1E293B',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    gap: 4,
-  },
-  toolBtnText: {
-    color: '#CBD5E1',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  solveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#10B981',
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 8,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    marginBottom: 6,
-  },
-  solveButtonDisabled: {
-    opacity: 0.45,
-    shadowOpacity: 0,
-  },
-  solveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  adWrap: {
-    alignItems: 'center',
-  },
+
+  /* Modal Styles */
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    backgroundColor: 'rgba(2, 20, 26, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
   },
   modalContent: {
     width: '100%',
-    maxWidth: 520,
-    maxHeight: '94%',
-    backgroundColor: '#0F172A',
+    maxWidth: 500,
+    backgroundColor: 'rgba(6, 46, 58, 0.95)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(34, 211, 238, 0.35)',
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(34, 211, 238, 0.4)',
-    padding: 16,
-  },
-  netSvgBox: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    paddingBottom: 10,
-    marginBottom: 8,
+    borderBottomColor: 'rgba(34, 211, 238, 0.2)',
   },
   modalTitle: {
-    color: '#F8FAFC',
-    fontSize: 15,
-    fontWeight: '800',
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
   modalCloseBtn: {
     padding: 4,
   },
-  modalDoneBtn: {
-    backgroundColor: '#1E293B',
-    paddingVertical: 10,
-    borderRadius: 10,
+  modalBody: {
+    padding: 16,
     alignItems: 'center',
-    marginTop: 10,
-  },
-  modalDoneText: {
-    color: '#22d3ee',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  pyraminxLegendBar: {
-    position: 'absolute',
-    top: 56,
-    left: 12,
-    flexDirection: 'row',
-    gap: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.25)',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  legendDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#38BDF8',
-  },
-  legendRing: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#F59E0B',
-  },
-  legendPlain: {
-    width: 8,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: '#94A3B8',
-  },
-  legendText: {
-    color: '#E2E8F0',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  narrowScreenNetBanner: {
-    position: 'absolute',
-    top: 8,
-    left: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(24, 22, 20, 0.92)',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 180, 0, 0.4)',
-    zIndex: 20,
-  },
-  narrowScreenNetText: {
-    color: '#FFB400',
-    fontSize: 11,
-    fontWeight: '600',
-    flex: 1,
   },
 });

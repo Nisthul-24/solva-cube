@@ -22,6 +22,7 @@ import { UI_COLORS } from '../src/constants/colors';
 import { PUZZLE_LEARN_CONTENT } from '../src/constants/learnContent';
 import { PuzzleId } from '../src/types/puzzle';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { AquaticBackground } from '../src/components/common/AquaticBackground';
 
 const PUZZLES: Array<{ id: PuzzleId; label: string }> = [
   { id: '3x3', label: '3x3 Cube' },
@@ -145,7 +146,8 @@ function LearnContent() {
   const tips = content?.tips ?? [];
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg }]} edges={['top', 'left', 'right']}>
+    <AquaticBackground>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]} edges={['top', 'left', 'right']}>
       {/* Navigation Header */}
       <View style={[styles.navHeader, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
         <TouchableOpacity
@@ -332,6 +334,7 @@ function LearnContent() {
         )}
       </ScrollView>
     </SafeAreaView>
+  </AquaticBackground>
   );
 }
 
