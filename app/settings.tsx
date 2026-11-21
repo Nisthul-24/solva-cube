@@ -10,7 +10,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   ArrowLeft,
@@ -43,6 +43,7 @@ import { OPEN_SOURCE_LICENSES } from '../src/constants/licensesData';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const isDarkMode = useSettingsStore((s) => s.isDarkMode);
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
   const hapticsEnabled = useSettingsStore((s) => s.hapticsEnabled);
@@ -98,7 +99,13 @@ export default function SettingsScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 24) + 16 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* SOLVER & 3D ANIMATION */}
         <Text style={[styles.sectionHeading, { color: theme.textSecondary }]}>3D SOLVER & ANIMATION</Text>
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>

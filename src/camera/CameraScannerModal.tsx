@@ -11,6 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Camera, RefreshCw, Check, AlertTriangle, Download, Database } from 'lucide-react-native';
 import { CubeColor } from '../types/puzzle';
 import { PALETTE } from '../components/3d/stickerLayout';
@@ -54,6 +55,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   dimension,
   onScanComplete,
 }) => {
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [currentFaceIndex, setCurrentFaceIndex] = useState(0);
   const [scannedFaceDetections, setScannedFaceDetections] = useState<Record<string, StickerDetectionResult[]>>({});
@@ -391,7 +393,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
         {/* Top Header */}
-        <View style={styles.topBar}>
+        <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 16) }]}>
           <TouchableOpacity onPress={onClose} style={styles.iconBtn} accessibilityLabel="Close scanner">
             <X color="#F8FAFC" size={24} />
           </TouchableOpacity>
@@ -463,7 +465,13 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
           {/* Confirm Face Dialog (Rule 2g, 2h) */}
           {isReviewing && currentFaceStickers && (
             <View style={styles.reviewOverlay}>
-              <ScrollView contentContainerStyle={styles.reviewScrollContent} showsVerticalScrollIndicator={false}>
+              <ScrollView
+                contentContainerStyle={[
+                  styles.reviewScrollContent,
+                  { paddingTop: Math.max(insets.top, 20), paddingBottom: Math.max(insets.bottom, 20) },
+                ]}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.reviewCard}>
                   <Text style={styles.reviewTitle}>Confirm Face Colors</Text>
                   <Text style={styles.reviewSubtitle}>
@@ -597,7 +605,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 
         {/* Bottom Control Bar in Live Preview (Rule 2c) */}
         {!isReviewing && (
-          <View style={styles.bottomBar}>
+          <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 20), paddingTop: 16 }]}>
             <Text style={styles.helperText}>Fill the grid with one face, hold it flat to the camera</Text>
             <TouchableOpacity style={styles.snapBtn} onPress={handleSnap} activeOpacity={0.75} accessibilityLabel="Take snapshot">
               <View style={styles.snapBtnInner} />

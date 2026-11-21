@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Linking } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -28,6 +29,7 @@ export function ConfettiOverlay({
   onSolveAnother,
   onDismiss,
 }: ConfettiOverlayProps) {
+  const insets = useSafeAreaInsets();
   const isDarkMode = useSettingsStore((s) => s.isDarkMode);
   const theme = isDarkMode ? UI_COLORS.dark : UI_COLORS.light;
 
@@ -61,7 +63,17 @@ export function ConfettiOverlay({
   });
 
   return (
-    <View style={styles.overlay}>
+    <View
+      style={[
+        styles.overlay,
+        {
+          paddingTop: Math.max(insets.top, 16),
+          paddingBottom: Math.max(insets.bottom, 16),
+          paddingLeft: Math.max(insets.left, 16),
+          paddingRight: Math.max(insets.right, 16),
+        },
+      ]}
+    >
       {/* Falling confetti particles */}
       {particles.map((p) => (
         <ConfettiParticle key={p.id} {...p} />

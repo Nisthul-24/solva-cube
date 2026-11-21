@@ -9,7 +9,7 @@ import {
   Platform,
   BackHandler,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -56,6 +56,7 @@ import { keepAwakeService } from '../src/services/keepAwakeService';
 
 export default function SolutionPlayerScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isWide = width >= 768;
 
@@ -678,7 +679,10 @@ export default function SolutionPlayerScreen() {
         {/* Step Card & Controls */}
         <ScrollView
           style={isWide ? styles.controlsWide : styles.controlsMobile}
-          contentContainerStyle={styles.controlsScrollContent}
+          contentContainerStyle={[
+            styles.controlsScrollContent,
+            { paddingBottom: Math.max(insets.bottom, 24) + 24 },
+          ]}
           showsVerticalScrollIndicator={false}
         >
           {/* Progress Bar & Counters */}

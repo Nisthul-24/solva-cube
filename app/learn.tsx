@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft,
@@ -125,6 +125,7 @@ function LayerNumberingDiagram() {
 
 function LearnContent() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ puzzle?: string }>();
   const activePuzzleId = usePuzzleStore((s) => s.activePuzzleId);
   const isDarkMode = useSettingsStore((s) => s.isDarkMode);
@@ -189,7 +190,13 @@ function LearnContent() {
         })}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 24) + 16 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* How to hold card */}
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.cardHeader}>

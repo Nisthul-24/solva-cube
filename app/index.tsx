@@ -11,7 +11,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChevronRight, PlayCircle, X } from 'lucide-react-native';
@@ -19,6 +19,7 @@ import { HomeHeader } from '../src/components/home/HomeHeader';
 import { HomePuzzleRow, HomePuzzleItem } from '../src/components/home/HomePuzzleRow';
 import { BannerAdView } from '../src/ads/BannerAdView';
 import { usePuzzleStore } from '../src/store/puzzleStore';
+import { useSettingsStore } from '../src/store/settingsStore';
 import { PuzzleId } from '../src/types/puzzle';
 import { hapticFeedback } from '../src/services/hapticsService';
 import { getPuzzle } from '../src/solvers';
@@ -53,6 +54,8 @@ const PUZZLES: HomePuzzleItem[] = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const adsRemoved = useSettingsStore((s) => s.adsRemoved);
   const setActivePuzzle = usePuzzleStore((s) => s.setActivePuzzle);
 
   const [isScrolled, setIsScrolled] = useState(false);
@@ -176,7 +179,12 @@ export default function HomeScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingBottom: Math.max(insets.bottom, 24) + (adsRemoved ? 24 : 76),
+          },
+        ]}
         onScroll={handleScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
@@ -268,7 +276,9 @@ export default function HomeScreen() {
       </ScrollView>
 
       {/* Banner Ad anchored to bottom outside scrolling area (8 dp spacing, collapse to 0 on error) */}
-      <BannerAdView />
+      <View style={{ paddingBottom: Math.max(insets.bottom, 8) }}>
+        <BannerAdView />
+      </View>
     </SafeAreaView>
   );
 }

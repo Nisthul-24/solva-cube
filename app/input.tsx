@@ -11,7 +11,7 @@ import {
   Platform,
   BackHandler,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   RotateCcw,
@@ -145,6 +145,7 @@ const PYRAMINX_WIZARD_FACES: FaceStepConfig[] = [
 
 export default function ColourInputScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isWide = width >= 768;
 
@@ -433,7 +434,16 @@ export default function ColourInputScreen() {
         </View>
 
         {/* Bottom Sheet: Palette, Tools & Solve Button (Requirement 3) */}
-        <View style={isWide ? styles.sheetWide : styles.sheetMobile}>
+        <View
+          style={[
+            isWide ? styles.sheetWide : styles.sheetMobile,
+            {
+              paddingBottom: Math.max(insets.bottom, 12),
+              paddingLeft: Math.max(insets.left, isWide ? 16 : 14),
+              paddingRight: Math.max(insets.right, isWide ? 16 : 14),
+            },
+          ]}
+        >
           {/* Validation Error Banner */}
           {solveError && (
             <View style={styles.errorCard}>
