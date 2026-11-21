@@ -1098,12 +1098,12 @@ const styles = StyleSheet.create({
   stageMobile: {
     width: '100%',
     height: 320,
-    backgroundColor: '#0B1120',
+    backgroundColor: 'transparent',
   },
   stageWide: {
     flex: 1.2,
     height: '100%',
-    backgroundColor: '#0B1120',
+    backgroundColor: 'transparent',
   },
   controlsMobile: {
     flex: 1,
