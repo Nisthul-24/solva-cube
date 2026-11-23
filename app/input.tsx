@@ -42,7 +42,11 @@ import { getPuzzle } from '../src/solvers';
 import { PuzzleColor, CubeColor } from '../src/types/puzzle';
 import { hapticFeedback } from '../src/services/hapticsService';
 import { FaceName3x3, PALETTE } from '../src/components/3d/stickerLayout';
-import { initCube3x3Solver } from '../src/solvers/cube3x3/kociembaAdapter';
+import {
+  initCube3x3Solver,
+  isCube3x3SolverReady,
+  onCube3x3SolverReady,
+} from '../src/solvers/cube3x3/kociembaAdapter';
 
 interface FaceStepConfig {
   face: string;
@@ -194,6 +198,18 @@ export default function InputScreen() {
   const theme = isDarkMode ? UI_COLORS.dark : UI_COLORS.light;
 
   const [showUnlock4x4Modal, setShowUnlock4x4Modal] = useState(false);
+  const [isSolverReady, setIsSolverReady] = useState(isCube3x3SolverReady());
+
+  useEffect(() => {
+    if (isCube3x3SolverReady()) {
+      setIsSolverReady(true);
+      return;
+    }
+    const unsubscribe = onCube3x3SolverReady(() => {
+      setIsSolverReady(true);
+    });
+    return unsubscribe;
+  }, []);
 
   const puzzle = getPuzzle(activePuzzleId);
   const expectedCountPerColor =
@@ -543,33 +559,51 @@ export default function InputScreen() {
       </View>
 
       {/* Big Glossy 3D Emerald Solve Button */}
-      <TouchableOpacity
-        style={[
-          styles.glossySolveButton,
-          !isComplete && styles.glossySolveButtonDisabled,
-        ]}
-        onPress={handleSolve}
-        disabled={!isComplete || isSolving}
-        accessibilityRole="button"
-        accessibilityLabel="Check & Solve Cube"
-        activeOpacity={0.85}
-      >
-        {/* Specular curved top sheen */}
-        <View style={styles.solveSheenOverlay} />
+      {(() => {
+        const isPreparingSolver =
+          (activePuzzleId === '3x3' || activePuzzleId === '4x4') && !isSolverReady;
 
-        {isSolving ? (
-          <ActivityIndicator size="small" color="#FFFFFF" />
-        ) : (
-          <View style={styles.solveButtonContent}>
-            <Text style={styles.glossySolveButtonText}>
-              {isComplete
+        return (
+          <TouchableOpacity
+            style={[
+              styles.glossySolveButton,
+              (!isComplete || isPreparingSolver) && styles.glossySolveButtonDisabled,
+            ]}
+            onPress={handleSolve}
+            disabled={!isComplete || isSolving || isPreparingSolver}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isPreparingSolver
+                ? 'Preparing solver, please wait'
+                : isComplete
                 ? 'Check & Solve Cube'
-                : `Fill All Stickers (${expectedCountPerColor * puzzle.colors.length} total)`}
-            </Text>
-            {isComplete && <Play size={17} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 6 }} />}
-          </View>
-        )}
-      </TouchableOpacity>
+                : 'Fill All Stickers'
+            }
+            activeOpacity={0.85}
+          >
+            {/* Specular curved top sheen */}
+            <View style={styles.solveSheenOverlay} />
+
+            {isSolving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : isComplete && isPreparingSolver ? (
+              <View style={styles.solveButtonContent}>
+                <ActivityIndicator size="small" color="#34D399" style={{ marginRight: 8 }} />
+                <Text style={styles.glossySolveButtonText}>Preparing solver…</Text>
+              </View>
+            ) : (
+              <View style={styles.solveButtonContent}>
+                <Text style={styles.glossySolveButtonText}>
+                  {isComplete
+                    ? 'Check & Solve Cube'
+                    : `Fill All Stickers (${expectedCountPerColor * puzzle.colors.length} total)`}
+                </Text>
+                {isComplete && <Play size={17} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: 6 }} />}
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      })()}
     </View>
   );
 

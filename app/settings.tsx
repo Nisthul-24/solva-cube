@@ -560,49 +560,51 @@ export default function SettingsScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* Debug Logs Modal */}
-      <Modal
-        visible={showDebugLogsModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowDebugLogsModal(false)}
-      >
-        <SafeAreaView style={[styles.modalBackdrop, { backgroundColor: 'rgba(0,0,0,0.75)' }]}>
-          <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.border, maxHeight: '80%' }]}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={[styles.modalTitle, { color: theme.text }]}>Lifecycle & Debug Logs</Text>
-                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>Last 50 recorded events</Text>
+      {/* Debug Logs Modal (Dev Only) */}
+      {typeof __DEV__ !== 'undefined' && __DEV__ && (
+        <Modal
+          visible={showDebugLogsModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowDebugLogsModal(false)}
+        >
+          <SafeAreaView style={[styles.modalBackdrop, { backgroundColor: 'rgba(0,0,0,0.75)' }]}>
+            <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.border, maxHeight: '80%' }]}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={[styles.modalTitle, { color: theme.text }]}>Lifecycle & Debug Logs</Text>
+                  <Text style={{ color: theme.textSecondary, fontSize: 12 }}>Last 50 recorded events</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowDebugLogsModal(false)}
+                  style={styles.closeBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close"
+                >
+                  <X color={theme.text} size={22} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                onPress={() => setShowDebugLogsModal(false)}
-                style={styles.closeBtn}
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-              >
-                <X color={theme.text} size={22} />
-              </TouchableOpacity>
+              <ScrollView style={{ maxHeight: 380, padding: 8 }} showsVerticalScrollIndicator={true}>
+                {debugLogger.getLogs().length === 0 ? (
+                  <Text style={{ color: theme.textSecondary, textAlign: 'center', padding: 20 }}>No logs recorded yet.</Text>
+                ) : (
+                  debugLogger.getLogs().map((item, idx) => (
+                    <View key={idx} style={{ marginBottom: 8, paddingBottom: 6, borderBottomWidth: 0.5, borderBottomColor: theme.border }}>
+                      <Text style={{ color: item.level === 'error' ? '#EF4444' : item.level === 'warn' ? '#F59E0B' : '#06B6D4', fontSize: 11, fontFamily: 'monospace', fontWeight: '700' }}>
+                        [{item.timestamp}] [{item.level.toUpperCase()}]
+                      </Text>
+                      <Text style={{ color: theme.text, fontSize: 12, marginTop: 2 }}>{item.message}</Text>
+                      {item.details && (
+                        <Text style={{ color: theme.textSecondary, fontSize: 10, fontFamily: 'monospace', marginTop: 2 }}>{item.details}</Text>
+                      )}
+                    </View>
+                  ))
+                )}
+              </ScrollView>
             </View>
-            <ScrollView style={{ maxHeight: 380, padding: 8 }} showsVerticalScrollIndicator={true}>
-              {debugLogger.getLogs().length === 0 ? (
-                <Text style={{ color: theme.textSecondary, textAlign: 'center', padding: 20 }}>No logs recorded yet.</Text>
-              ) : (
-                debugLogger.getLogs().map((item, idx) => (
-                  <View key={idx} style={{ marginBottom: 8, paddingBottom: 6, borderBottomWidth: 0.5, borderBottomColor: theme.border }}>
-                    <Text style={{ color: item.level === 'error' ? '#EF4444' : item.level === 'warn' ? '#F59E0B' : '#06B6D4', fontSize: 11, fontFamily: 'monospace', fontWeight: '700' }}>
-                      [{item.timestamp}] [{item.level.toUpperCase()}]
-                    </Text>
-                    <Text style={{ color: theme.text, fontSize: 12, marginTop: 2 }}>{item.message}</Text>
-                    {item.details && (
-                      <Text style={{ color: theme.textSecondary, fontSize: 10, fontFamily: 'monospace', marginTop: 2 }}>{item.details}</Text>
-                    )}
-                  </View>
-                ))
-              )}
-            </ScrollView>
-          </View>
-        </SafeAreaView>
-      </Modal>
+          </SafeAreaView>
+        </Modal>
+      )}
     </SafeAreaView>
   </AquaticBackground>
   );

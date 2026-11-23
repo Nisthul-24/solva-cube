@@ -278,14 +278,114 @@ function solveWithIDA(start: { p: number[]; o: number[] }): string[] {
   throw new Error('No 2x2 solution found within 11 moves.');
 }
 
+let is2x2InitInProgress = false;
+let init2x2Promise: Promise<void> | null = null;
+
+export async function initCube2x2Solver(): Promise<void> {
+  if (permDistTable && oriDistTable && c4DistTable) return;
+  if (init2x2Promise) return init2x2Promise;
+
+  init2x2Promise = (async () => {
+    let lastYield = Date.now();
+    const yieldIfTime = async () => {
+      if (Date.now() - lastYield > 20) {
+        await new Promise<void>((r) => setTimeout(r, 0));
+        lastYield = Date.now();
+      }
+    };
+
+    // 1. Permutation table (5040 states)
+    const permDist = new Int8Array(5040).fill(-1);
+    permDist[0] = 0;
+    let pQueue: number[][] = [[0, 1, 2, 3, 4, 5, 6]];
+    let depth = 0;
+    while (pQueue.length > 0) {
+      depth++;
+      const nextQ: number[][] = [];
+      for (const cur of pQueue) {
+        for (const { m } of ALL_MOVES_7) {
+          const nextP = new Array(7);
+          for (let i = 0; i < 7; i++) nextP[i] = cur[m.p[i]];
+          const idx = permToIdx(nextP);
+          if (permDist[idx] === -1) {
+            permDist[idx] = depth;
+            nextQ.push(nextP);
+          }
+        }
+        await yieldIfTime();
+      }
+      pQueue = nextQ;
+    }
+
+    // 2. Orientation table (729 states)
+    const oriDist = new Int8Array(729).fill(-1);
+    oriDist[0] = 0;
+    let oQueue: number[][] = [[0, 0, 0, 0, 0, 0, 0]];
+    depth = 0;
+    while (oQueue.length > 0) {
+      depth++;
+      const nextQ: number[][] = [];
+      for (const cur of oQueue) {
+        for (const { m } of ALL_MOVES_7) {
+          const nextO = new Array(7);
+          for (let i = 0; i < 7; i++) nextO[i] = (cur[m.p[i]] + m.o[i]) % 3;
+          const idx = oriToIdx(nextO);
+          if (oriDist[idx] === -1) {
+            oriDist[idx] = depth;
+            nextQ.push(nextO);
+          }
+        }
+        await yieldIfTime();
+      }
+      oQueue = nextQ;
+    }
+
+    // 3. C4 table (68040 states)
+    const c4Dist = new Int8Array(68040).fill(-1);
+    c4Dist[0] = 0;
+    let c4Queue: Array<{ p: number[]; o: number[] }> = [
+      { p: [0, 1, 2, 3, 4, 5, 6], o: [0, 0, 0, 0, 0, 0, 0] },
+    ];
+    depth = 0;
+    while (c4Queue.length > 0) {
+      depth++;
+      const nextQ: Array<{ p: number[]; o: number[] }> = [];
+      for (const cur of c4Queue) {
+        for (const { m } of ALL_MOVES_7) {
+          const next = applyMoveTo7(cur, m);
+          const idx = c4ToIdx(next.p, next.o);
+          if (c4Dist[idx] === -1) {
+            c4Dist[idx] = depth;
+            nextQ.push(next);
+          }
+        }
+        await yieldIfTime();
+      }
+      c4Queue = nextQ;
+    }
+
+    permDistTable = permDist;
+    oriDistTable = oriDist;
+    c4DistTable = c4Dist;
+  })();
+
+  return init2x2Promise;
+}
+
+export function isCube2x2SolverReady(): boolean {
+  return !!(permDistTable && oriDistTable && c4DistTable);
+}
+
 export class Cube2x2Solver implements Puzzle<Cube2x2State> {
   readonly id = '2x2' as const;
   readonly name = '2x2 Pocket Cube';
   readonly colors = COLORS_2X2;
 
   constructor() {
-    // Precompute pruning tables on solver initialization
-    ensurePruningTables();
+    // Non-blocking background initialization instead of blocking constructor
+    if (!permDistTable) {
+      initCube2x2Solver().catch(() => {});
+    }
   }
 
   getFaces(): FaceLayout[] {

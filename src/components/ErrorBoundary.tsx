@@ -51,6 +51,26 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      // In production builds, show only a simple user-facing message with Restart button
+      if (typeof __DEV__ === 'undefined' || !__DEV__) {
+        return (
+          <View style={styles.container}>
+            <View style={styles.iconBox}>
+              <AlertCircle color="#EF4444" size={44} />
+            </View>
+            <Text style={styles.title}>Something went wrong</Text>
+            <Text style={styles.message}>
+              SolvaCube caught an unexpected error.
+            </Text>
+            <TouchableOpacity style={styles.btn} onPress={this.handleReset}>
+              <RefreshCw color="#FFFFFF" size={18} />
+              <Text style={styles.btnText}>Restart</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      // In development mode, show diagnostics and recent lifecycle logs
       const logs = debugLogger.getLogs();
 
       return (
@@ -71,11 +91,11 @@ export class ErrorBoundary extends Component<Props, State> {
             </TouchableOpacity>
             <TouchableOpacity style={styles.btn} onPress={this.handleReset}>
               <RefreshCw color="#FFFFFF" size={18} />
-              <Text style={styles.btnText}>Try Again</Text>
+              <Text style={styles.btnText}>Restart</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Diagnostic logs toggle */}
+          {/* Diagnostic logs toggle (dev only) */}
           <TouchableOpacity style={styles.logToggleBtn} onPress={this.toggleLogs}>
             <Terminal color="#94A3B8" size={14} />
             <Text style={styles.logToggleText}>
@@ -157,7 +177,7 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 14,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   details: {
     color: '#EF4444',

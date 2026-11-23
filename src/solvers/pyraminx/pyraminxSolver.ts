@@ -201,6 +201,50 @@ function isBodySolved(state: number[]): boolean {
 
 // Global cached pruning table for edges (11,520 states)
 let edgePruningTable: Map<string, number> | null = null;
+let initPyraminxPromise: Promise<void> | null = null;
+
+export async function initPyraminxSolver(): Promise<void> {
+  if (edgePruningTable) return;
+  if (initPyraminxPromise) return initPyraminxPromise;
+
+  initPyraminxPromise = (async () => {
+    const table = new Map<string, number>();
+    const startHash = hashEdges(SOLVED_FLAT_COLORS);
+    table.set(startHash, 0);
+
+    let queue: number[][] = [SOLVED_FLAT_COLORS];
+    let depth = 0;
+    let lastYield = Date.now();
+
+    while (queue.length > 0) {
+      depth++;
+      const nextQ: number[][] = [];
+      for (const cur of queue) {
+        for (const m of BODY_MOVE_NAMES) {
+          const next = applyPermutation(cur, PYRAMINX_MOVE_PERMUTATIONS[m]);
+          const h = hashEdges(next);
+          if (!table.has(h)) {
+            table.set(h, depth);
+            nextQ.push(next);
+          }
+        }
+        if (Date.now() - lastYield > 20) {
+          await new Promise<void>((r) => setTimeout(r, 0));
+          lastYield = Date.now();
+        }
+      }
+      queue = nextQ;
+    }
+
+    edgePruningTable = table;
+  })();
+
+  return initPyraminxPromise;
+}
+
+export function isPyraminxSolverReady(): boolean {
+  return !!edgePruningTable;
+}
 
 function ensurePyraminxPruningTable() {
   if (edgePruningTable) return;
@@ -271,7 +315,9 @@ export class PyraminxSolver implements Puzzle<PyraminxState> {
   readonly colors = COLORS_PYRAMINX;
 
   constructor() {
-    ensurePyraminxPruningTable();
+    if (!edgePruningTable) {
+      initPyraminxSolver().catch(() => {});
+    }
   }
 
   getFaces(): FaceLayout[] {

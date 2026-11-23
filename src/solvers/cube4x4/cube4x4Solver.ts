@@ -1,4 +1,5 @@
 import Cube from 'cubejs';
+import { initCube3x3Solver } from '../cube3x3/kociembaAdapter';
 import {
   Puzzle,
   PuzzleId,
@@ -195,7 +196,7 @@ export class Cube4x4Solver implements Puzzle<Cube4x4State> {
   async solve(state: Cube4x4State): Promise<Move[]> {
     if (this.isSolved(state)) return [];
 
-    Cube.initSolver();
+    await initCube3x3Solver();
 
     let cur = this.cloneState(state);
     const moves: Move[] = [];

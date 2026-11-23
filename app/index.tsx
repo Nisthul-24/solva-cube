@@ -103,6 +103,12 @@ export default function HomeScreen() {
 
   // Android BackHandler: double-tap back to exit on Home screen
   useEffect(() => {
+    // Start chunked solver warm-up in background right after home screen displays
+    const solverWarmupTimer = setTimeout(() => {
+      initCube3x3Solver().catch(() => {});
+    }, 150);
+
+    let backPressSub: any;
     if (Platform.OS === 'android') {
       let backPressCount = 0;
       let timer: any = null;
@@ -122,9 +128,13 @@ export default function HomeScreen() {
       });
       return () => {
         clearTimeout(timer);
+        clearTimeout(solverWarmupTimer);
         sub.remove();
       };
     }
+    return () => {
+      clearTimeout(solverWarmupTimer);
+    };
   }, []);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
