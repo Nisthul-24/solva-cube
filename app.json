@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "scheme": "solvacube",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -18,13 +18,15 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/adaptive-monochrome.png",
         "backgroundColor": "#181614"
       },
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
         "CAMERA",
-        "com.google.android.gms.permission.AD_ID"
+        "com.google.android.gms.permission.AD_ID",
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -54,24 +56,25 @@
       [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-XXXX~YYYY",
-          "iosAppId": "ca-app-pub-XXXX~YYYY",
+          "androidAppId": "ca-app-pub-2748169504355594~2047960594",
+          "iosAppId": "ca-app-pub-2748169504355594~2047960594",
           "userTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you."
         }
       ]
     ],
     "extra": {
-      "privacyPolicyUrl": "https://solvacube.app/privacy-policy.html",
-      "eas": {
-        "projectId": "your-eas-project-id"
-      },
+      "privacyPolicyUrl": "https://nisthul-24.github.io/solvacube-privacy/privacy-policy.html",
       "adMob": {
-        "androidAppId": "ca-app-pub-XXXX~YYYY",
-        "bannerAdUnitId": "ca-app-pub-XXXX/BBBB",
-        "interstitialAdUnitId": "ca-app-pub-XXXX/IIII",
-        "rewardedAdUnitId": "ca-app-pub-XXXX/RRRR"
+        "androidAppId": "ca-app-pub-2748169504355594~2047960594",
+        "bannerAdUnitId": "ca-app-pub-2748169504355594/3203140495",
+        "interstitialAdUnitId": "ca-app-pub-2748169504355594/4947467009",
+        "rewardedAdUnitId": "ca-app-pub-2748169504355594/3770116708"
+      },
+      "router": {},
+      "eas": {
+        "projectId": "c603e231-db2b-49e1-9aea-7275fd8d4ebb"
       }
-    }
+    },
+    "owner": "nisthul"
   }
 }
-

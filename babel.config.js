@@ -5,7 +5,6 @@ module.exports = function (api) {
     presets: ['babel-preset-expo'],
     plugins: [
       '@babel/plugin-transform-class-static-block',
-      'react-native-reanimated/plugin',
       ...(isProd
         ? [
             [
@@ -14,6 +13,7 @@ module.exports = function (api) {
             ],
           ]
         : []),
+      'react-native-worklets/plugin',
     ],
   };
 };

@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 12.0.0"
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -22,7 +23,11 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_USE_TEST_ADS": "false"
+        "EXPO_PUBLIC_USE_TEST_ADS": "false",
+        "EXPO_PUBLIC_ADMOB_APP_ID": "ca-app-pub-2748169504355594~2047960594",
+        "EXPO_PUBLIC_BANNER_ID": "ca-app-pub-2748169504355594/3203140495",
+        "EXPO_PUBLIC_INTERSTITIAL_ID": "ca-app-pub-2748169504355594/4947467009",
+        "EXPO_PUBLIC_REWARDED_ID": "ca-app-pub-2748169504355594/3770116708"
       },
       "android": {
         "buildType": "app-bundle"
@@ -38,4 +43,3 @@
     }
   }
 }
-
