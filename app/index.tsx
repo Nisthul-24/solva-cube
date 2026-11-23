@@ -25,6 +25,7 @@ import { PuzzleId } from '../src/types/puzzle';
 import { hapticFeedback } from '../src/services/hapticsService';
 import { getPuzzle } from '../src/solvers';
 import { HOME_THEME } from '../src/constants/homeTheme';
+import { initCube3x3Solver } from '../src/solvers/cube3x3/kociembaAdapter';
 
 const PUZZLES: HomePuzzleItem[] = [
   {
@@ -134,6 +135,13 @@ export default function HomeScreen() {
   const handleSelectPuzzle = async (id: PuzzleId) => {
     hapticFeedback.light();
     setLoadError(null);
+
+    // Warm up 3x3 solver asynchronously after initiating navigation
+    if (id === '3x3') {
+      setTimeout(() => {
+        initCube3x3Solver().catch(() => {});
+      }, 100);
+    }
 
     try {
       const plugin = getPuzzle(id);

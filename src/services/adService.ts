@@ -1,11 +1,33 @@
 import { Platform } from 'react-native';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { useSettingsStore } from '../store/settingsStore';
+import { debugLogger } from './debugLogger';
 import {
   getAdUnitId,
   getTestDeviceIdentifiers,
   ADS_TIMING_RULES,
 } from '../constants/adsConfig';
+
+// Helper: Wrap a promise with a hard timeout that fails open (resolves fallback)
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  let timer: any;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), timeoutMs);
+  });
+  return Promise.race([
+    promise
+      .then((res) => {
+        clearTimeout(timer);
+        return res;
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        debugLogger.warn('Network / Ad step failed open:', err);
+        return fallback;
+      }),
+    timeoutPromise,
+  ]);
+}
 
 // Safe check: Is running inside Expo Go client?
 export const isExpoGo =
@@ -71,11 +93,27 @@ class AdService {
 
     try {
       if (AdsConsent) {
-        const consentInfo = await AdsConsent.requestInfoUpdate();
-        if (consentInfo.isConsentFormAvailable && consentInfo.status === AdsConsentStatus?.REQUIRED) {
-          const formResult = await AdsConsent.showForm();
-          const status = formResult.status === AdsConsentStatus?.OBTAINED ? 'granted' : 'denied';
-          useSettingsStore.getState().setConsentStatus(status);
+        debugLogger.log('AdMob: Requesting UMP consent info (3s timeout)');
+        const consentInfo = await withTimeout<any>(
+          AdsConsent.requestInfoUpdate(),
+          3000,
+          null
+        );
+        if (
+          consentInfo &&
+          consentInfo.isConsentFormAvailable &&
+          consentInfo.status === AdsConsentStatus?.REQUIRED
+        ) {
+          debugLogger.log('AdMob: Showing UMP consent form (3s timeout)');
+          const formResult = await withTimeout<any>(
+            AdsConsent.showForm(),
+            3000,
+            null
+          );
+          if (formResult) {
+            const status = formResult.status === AdsConsentStatus?.OBTAINED ? 'granted' : 'denied';
+            useSettingsStore.getState().setConsentStatus(status);
+          }
         }
       }
 
@@ -87,13 +125,15 @@ class AdService {
         // non-blocking
       }
 
-      await mobileAds().initialize();
+      debugLogger.log('AdMob: Initializing SDK (3s timeout)');
+      await withTimeout<any>(mobileAds().initialize(), 3000, null);
       this.isInitialized = true;
+      debugLogger.log('AdMob: Initialized successfully');
 
       this.preloadInterstitial();
       this.preloadRewarded();
     } catch (e) {
-      console.warn('AdMob/UMP init warning (gracefully non-blocking):', e);
+      debugLogger.warn('AdMob/UMP init warning (gracefully non-blocking):', e);
       this.isInitialized = true;
     }
   }

@@ -42,6 +42,7 @@ import { getPuzzle } from '../src/solvers';
 import { PuzzleColor, CubeColor } from '../src/types/puzzle';
 import { hapticFeedback } from '../src/services/hapticsService';
 import { FaceName3x3, PALETTE } from '../src/components/3d/stickerLayout';
+import { initCube3x3Solver } from '../src/solvers/cube3x3/kociembaAdapter';
 
 interface FaceStepConfig {
   face: string;
@@ -230,6 +231,15 @@ export default function InputScreen() {
   };
 
   // Android BackHandler: navigating back from Setup closes modals or goes to Home screen
+  useEffect(() => {
+    if (activePuzzleId === '3x3') {
+      const timer = setTimeout(() => {
+        initCube3x3Solver().catch(() => {});
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [activePuzzleId]);
+
   useEffect(() => {
     if (Platform.OS === 'android') {
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {

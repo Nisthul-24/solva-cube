@@ -29,7 +29,9 @@ import {
   Code2,
   X,
   RotateCcw,
+  Terminal,
 } from 'lucide-react-native';
+import { debugLogger } from '../src/services/debugLogger';
 import {
   useSettingsStore,
   AnimationSpeedOption,
@@ -69,6 +71,7 @@ export default function SettingsScreen() {
   const setIsColorBlindMode = useSettingsStore((s) => s.setIsColorBlindMode);
 
   const [showLicensesModal, setShowLicensesModal] = useState(false);
+  const [showDebugLogsModal, setShowDebugLogsModal] = useState(false);
   const [devSimulation, setDevSimulation] = useState(adController.getState().devSimulationMode);
 
   const theme = isDarkMode ? UI_COLORS.dark : UI_COLORS.light;
@@ -490,6 +493,23 @@ export default function SettingsScreen() {
                   <Text style={[styles.rowLabel, { color: '#EF4444' }]}>Reset Ad Timers & Counters</Text>
                 </View>
               </TouchableOpacity>
+
+              <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => setShowDebugLogsModal(true)}
+              >
+                <View style={styles.iconTitleRow}>
+                  <Terminal color={theme.primary} size={20} />
+                  <View>
+                    <Text style={[styles.rowLabel, { color: theme.text }]}>View Lifecycle & Debug Logs</Text>
+                    <Text style={[styles.rowDesc, { color: theme.textSecondary }]}>
+                      Inspect startup events, errors and timeouts
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
             </View>
           </>
         )}
@@ -535,6 +555,50 @@ export default function SettingsScreen() {
                   <Text style={[styles.pkgAuthor, { color: theme.textSecondary }]}>{pkg.author}</Text>
                 </View>
               ))}
+            </ScrollView>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Debug Logs Modal */}
+      <Modal
+        visible={showDebugLogsModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDebugLogsModal(false)}
+      >
+        <SafeAreaView style={[styles.modalBackdrop, { backgroundColor: 'rgba(0,0,0,0.75)' }]}>
+          <View style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.border, maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>Lifecycle & Debug Logs</Text>
+                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>Last 50 recorded events</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowDebugLogsModal(false)}
+                style={styles.closeBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <X color={theme.text} size={22} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 380, padding: 8 }} showsVerticalScrollIndicator={true}>
+              {debugLogger.getLogs().length === 0 ? (
+                <Text style={{ color: theme.textSecondary, textAlign: 'center', padding: 20 }}>No logs recorded yet.</Text>
+              ) : (
+                debugLogger.getLogs().map((item, idx) => (
+                  <View key={idx} style={{ marginBottom: 8, paddingBottom: 6, borderBottomWidth: 0.5, borderBottomColor: theme.border }}>
+                    <Text style={{ color: item.level === 'error' ? '#EF4444' : item.level === 'warn' ? '#F59E0B' : '#06B6D4', fontSize: 11, fontFamily: 'monospace', fontWeight: '700' }}>
+                      [{item.timestamp}] [{item.level.toUpperCase()}]
+                    </Text>
+                    <Text style={{ color: theme.text, fontSize: 12, marginTop: 2 }}>{item.message}</Text>
+                    {item.details && (
+                      <Text style={{ color: theme.textSecondary, fontSize: 10, fontFamily: 'monospace', marginTop: 2 }}>{item.details}</Text>
+                    )}
+                  </View>
+                ))
+              )}
             </ScrollView>
           </View>
         </SafeAreaView>

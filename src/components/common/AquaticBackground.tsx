@@ -25,7 +25,8 @@ export const AquaticBackground = memo(function AquaticBackground({
 }: AquaticBackgroundProps) {
   return (
     <View style={styles.container}>
-      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
         <Defs>
           {/* Main Deep Ocean Gradient */}
           <SvgLinearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -188,6 +189,7 @@ export const AquaticBackground = memo(function AquaticBackground({
           <Circle cx="71.5%" cy="90.5%" r="4" fill="url(#specularGlow)" />
         </G>
       </Svg>
+      </View>
 
       {/* Foreground Content */}
       {children}
