@@ -100,6 +100,12 @@ const allSrcFiles = getAllSourceFiles(path.resolve(__dirname, '../src'));
 const allFiles = [...allAppFiles, ...allSrcFiles];
 
 describe('Isolated Module Load Order Verification', () => {
+  it('ensures process.emitWarning is safely polyfilled for Hermes environments', () => {
+    require('../src/polyfills');
+    expect(typeof (process as any).emitWarning).toBe('function');
+    expect(() => (process as any).emitWarning('test deprecation warning')).not.toThrow();
+  });
+
   allFiles.forEach((file) => {
     const relativePath = path.relative(path.resolve(__dirname, '..'), file).replace(/\\/g, '/');
 

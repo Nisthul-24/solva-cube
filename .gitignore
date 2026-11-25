@@ -13,6 +13,7 @@ ios/
 
 # Logs
 *.log
+crash*.txt
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
