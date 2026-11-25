@@ -20,9 +20,7 @@ import {
   Sticker4x4Layout,
 } from '../solvers/cube4x4/cube4x4Geometry';
 import { FaceName3x3, Axis } from '../components/3d/cubieModel';
-import { getOrthonormalBasis, buildOrbitArrow } from '../components/3d/puzzleTurnInfo';
-
-export type OrbitArrowData = ReturnType<typeof buildOrbitArrow>;
+import { getOrthonormalBasis, buildOrbitArrow, OrbitArrowData } from '../components/3d/orbitArrow';
 
 export interface EngineSticker {
   id: string;

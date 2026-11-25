@@ -19,7 +19,13 @@ import { DEFAULT_PYRAMINX_SOLVED } from '../src/solvers/pyraminx/pyraminxFacelet
 import { getStandardSolved4x4State } from '../src/solvers/cube4x4/cube4x4Geometry';
 import * as THREE from 'three';
 
-const SOLVED_4X4 = getStandardSolved4x4State();
+let _solved4x4: any = null;
+function getSolved4x4() {
+  if (!_solved4x4) {
+    _solved4x4 = getStandardSolved4x4State();
+  }
+  return _solved4x4;
+}
 const MOVES_PER_SHEET = 12;
 
 export default function GalleryScreen() {
@@ -183,7 +189,7 @@ export default function GalleryScreen() {
                         />
                       ) : (
                         <PuzzleCube3D
-                          cubeState={SOLVED_4X4}
+                          cubeState={getSolved4x4()}
                           dimension={4}
                           currentMoveNotation={m.name}
                           isAnimating={false}
@@ -215,7 +221,7 @@ export default function GalleryScreen() {
                         />
                       ) : (
                         <PuzzleCube3D
-                          cubeState={SOLVED_4X4}
+                          cubeState={getSolved4x4()}
                           dimension={4}
                           currentMoveNotation={m.name}
                           staticProgress={0.25}
@@ -247,7 +253,7 @@ export default function GalleryScreen() {
                         />
                       ) : (
                         <PuzzleCube3D
-                          cubeState={SOLVED_4X4}
+                          cubeState={getSolved4x4()}
                           dimension={4}
                           currentMoveNotation={m.name}
                           staticProgress={0.50}
@@ -279,7 +285,7 @@ export default function GalleryScreen() {
                         />
                       ) : (
                         <PuzzleCube3D
-                          cubeState={SOLVED_4X4}
+                          cubeState={getSolved4x4()}
                           dimension={4}
                           currentMoveNotation={m.name}
                           staticProgress={1.00}

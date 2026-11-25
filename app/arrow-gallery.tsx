@@ -29,7 +29,13 @@ const DEFAULT_2X2_SOLVED = {
   B: ['blue', 'blue', 'blue', 'blue'],
 };
 
-const DEFAULT_4X4_SOLVED = getStandardSolved4x4State();
+let _default4x4Solved: any = null;
+function getDefault4x4Solved() {
+  if (!_default4x4Solved) {
+    _default4x4Solved = getStandardSolved4x4State();
+  }
+  return _default4x4Solved;
+}
 
 const MOVES_3X3 = [
   'R', "R'", 'R2',
@@ -260,7 +266,7 @@ export default function ArrowGalleryScreen() {
                           selectedPuzzle === '2x2'
                             ? DEFAULT_2X2_SOLVED
                             : selectedPuzzle === '4x4'
-                            ? DEFAULT_4X4_SOLVED
+                            ? getDefault4x4Solved()
                             : DEFAULT_3X3_SOLVED
                         }
                         dimension={selectedPuzzle === '2x2' ? 2 : selectedPuzzle === '4x4' ? 4 : 3}

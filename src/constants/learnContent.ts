@@ -256,7 +256,9 @@ export const PUZZLE_LEARN_CONTENT: Record<PuzzleId, PuzzleLearnContent> = {
       },
     ],
     parityDefinition: 'A state impossible on a 3x3 caused by edge/corner swaps within the extra slices.',
-    notations: get4x4DynamicNotations(),
+    get notations(): NotationItem[] {
+      return get4x4DynamicNotations();
+    },
     tips: [
       'Outer face moves (R, U, F, D, L, B) turn only the single outermost layer.',
       'Wide turns (Rw, Uw, Fw, Dw, Lw, Bw) turn the outer two layers together.',

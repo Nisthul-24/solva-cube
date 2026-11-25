@@ -33,6 +33,7 @@ export default function RootLayout() {
     // ==========================================
     const testModules = () => {
       const check = (name: string, fn: () => void) => {
+        console.warn(`[BOOTCHECK] TRY ${name}`);
         try {
           fn();
           console.warn(`[BOOTCHECK] OK ${name}`);
@@ -48,6 +49,9 @@ export default function RootLayout() {
       check('app/settings', () => require('./settings'));
       check('app/learn', () => require('./learn'));
       check('app/gallery', () => require('./gallery'));
+      check('app/arrow-gallery', () => require('./arrow-gallery'));
+      check('app/camera-test', () => require('./camera-test'));
+      check('app/colour-check', () => require('./colour-check'));
 
       // Solvers
       check('src/solvers/index', () => require('../src/solvers/index'));
@@ -71,6 +75,7 @@ export default function RootLayout() {
       // Ads & Camera
       check('src/ads/adController', () => require('../src/ads/adController'));
       check('src/ads/nativeAdAdapter', () => require('../src/ads/nativeAdAdapter'));
+      check('src/ads/BannerAdView', () => require('../src/ads/BannerAdView'));
       check('src/camera/CameraScannerModal', () => require('../src/camera/CameraScannerModal'));
 
       // Components
@@ -81,9 +86,14 @@ export default function RootLayout() {
       check('src/components/ConfettiOverlay', () => require('../src/components/ConfettiOverlay'));
       check('src/components/PuzzleNet', () => require('../src/components/PuzzleNet'));
       check('src/components/NetView2x2', () => require('../src/components/NetView2x2'));
+      check('src/components/NetView3x3', () => require('../src/components/NetView3x3'));
       check('src/components/NetViewPyraminx', () => require('../src/components/NetViewPyraminx'));
+      check('src/components/home/HomeHeader', () => require('../src/components/home/HomeHeader'));
+      check('src/components/home/HomePuzzleRow', () => require('../src/components/home/HomePuzzleRow'));
+      check('src/components/home/HomePuzzleIllustration', () => require('../src/components/home/HomePuzzleIllustration'));
 
       // 3D Components
+      check('src/components/3d/orbitArrow', () => require('../src/components/3d/orbitArrow'));
       check('src/components/3d/ThreeCanvas', () => require('../src/components/3d/ThreeCanvas'));
       check('src/components/3d/CameraRig', () => require('../src/components/3d/CameraRig'));
       check('src/components/3d/Cube3DView', () => require('../src/components/3d/Cube3DView'));
@@ -93,12 +103,16 @@ export default function RootLayout() {
       check('src/components/3d/cubieModel', () => require('../src/components/3d/cubieModel'));
       check('src/components/3d/puzzleTurnInfo', () => require('../src/components/3d/puzzleTurnInfo'));
       check('src/components/3d/stickerLayout', () => require('../src/components/3d/stickerLayout'));
+      check('src/components/3d/DirectionArrow3D', () => require('../src/components/3d/DirectionArrow3D'));
+      check('src/components/3d/TurnArrowRibbon3D', () => require('../src/components/3d/TurnArrowRibbon3D'));
 
       // Puzzle engine & constants
       check('src/puzzleEngine/puzzleEngine', () => require('../src/puzzleEngine/puzzleEngine'));
       check('src/puzzleEngine/stepPlan', () => require('../src/puzzleEngine/stepPlan'));
       check('src/components/playback/playbackController', () => require('../src/components/playback/playbackController'));
+      check('src/constants/adsConfig', () => require('../src/constants/adsConfig'));
       check('src/constants/colors', () => require('../src/constants/colors'));
+      check('src/constants/homeTheme', () => require('../src/constants/homeTheme'));
       check('src/constants/learnContent', () => require('../src/constants/learnContent'));
       check('src/constants/licensesData', () => require('../src/constants/licensesData'));
       check('src/constants/links', () => require('../src/constants/links'));
