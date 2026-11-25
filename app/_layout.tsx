@@ -32,6 +32,22 @@ export default function RootLayout() {
     // TEMP DIAGNOSTIC: Boot Self-Test
     // ==========================================
     const testModules = () => {
+      const errorUtils = (global as any).ErrorUtils;
+      const prevHandler = errorUtils?.getGlobalHandler?.();
+
+      if (errorUtils?.setGlobalHandler) {
+        errorUtils.setGlobalHandler((e: any, isFatal?: boolean) => {
+          console.warn(
+            '[BOOTCHECK] CAUGHT fatal=' +
+              isFatal +
+              ' | ' +
+              String(e && e.message) +
+              ' | ' +
+              String(e && e.stack)
+          );
+        });
+      }
+
       const check = (name: string, fn: () => void) => {
         console.warn(`[BOOTCHECK] TRY ${name}`);
         try {
@@ -42,96 +58,99 @@ export default function RootLayout() {
         }
       };
 
-      // Routes
-      check('app/index', () => require('./index'));
-      check('app/input', () => require('./input'));
-      check('app/player', () => require('./player'));
-      check('app/settings', () => require('./settings'));
-      check('app/learn', () => require('./learn'));
-      check('app/gallery', () => require('./gallery'));
-      check('app/arrow-gallery', () => require('./arrow-gallery'));
-      check('app/camera-test', () => require('./camera-test'));
-      check('app/colour-check', () => require('./colour-check'));
-
-      // Solvers
-      check('src/solvers/index', () => require('../src/solvers/index'));
-      check('src/solvers/cube3x3/kociembaAdapter', () => require('../src/solvers/cube3x3/kociembaAdapter'));
-      check('src/solvers/cube2x2/cube2x2Solver', () => require('../src/solvers/cube2x2/cube2x2Solver'));
-      check('src/solvers/pyraminx/pyraminxSolver', () => require('../src/solvers/pyraminx/pyraminxSolver'));
-      check('src/solvers/cube4x4/cube4x4Solver', () => require('../src/solvers/cube4x4/cube4x4Solver'));
-      check('src/solvers/cube3x3/cube3x3Facelets', () => require('../src/solvers/cube3x3/cube3x3Facelets'));
-      check('src/solvers/cube4x4/cube4x4Geometry', () => require('../src/solvers/cube4x4/cube4x4Geometry'));
-      check('src/solvers/pyraminx/pyraminxFacelets', () => require('../src/solvers/pyraminx/pyraminxFacelets'));
-
-      // Services & Stores
-      check('src/services/adService', () => require('../src/services/adService'));
-      check('src/services/debugLogger', () => require('../src/services/debugLogger'));
-      check('src/services/hapticsService', () => require('../src/services/hapticsService'));
-      check('src/services/keepAwakeService', () => require('../src/services/keepAwakeService'));
-      check('src/store/puzzleStore', () => require('../src/store/puzzleStore'));
-      check('src/store/settingsStore', () => require('../src/store/settingsStore'));
-      check('src/types/puzzle', () => require('../src/types/puzzle'));
-
-      // Ads & Camera
-      check('src/ads/adController', () => require('../src/ads/adController'));
-      check('src/ads/nativeAdAdapter', () => require('../src/ads/nativeAdAdapter'));
-      check('src/ads/BannerAdView', () => require('../src/ads/BannerAdView'));
-      check('src/camera/CameraScannerModal', () => require('../src/camera/CameraScannerModal'));
-
-      // Components
-      check('src/components/ErrorBoundary', () => require('../src/components/ErrorBoundary'));
-      check('src/components/common/AquaticBackground', () => require('../src/components/common/AquaticBackground'));
-      check('src/components/Header', () => require('../src/components/Header'));
-      check('src/components/ColorPalette', () => require('../src/components/ColorPalette'));
-      check('src/components/ConfettiOverlay', () => require('../src/components/ConfettiOverlay'));
-      check('src/components/PuzzleNet', () => require('../src/components/PuzzleNet'));
-      check('src/components/NetView2x2', () => require('../src/components/NetView2x2'));
-      check('src/components/NetView3x3', () => require('../src/components/NetView3x3'));
-      check('src/components/NetViewPyraminx', () => require('../src/components/NetViewPyraminx'));
-      check('src/components/home/HomeHeader', () => require('../src/components/home/HomeHeader'));
-      check('src/components/home/HomePuzzleRow', () => require('../src/components/home/HomePuzzleRow'));
-      check('src/components/home/HomePuzzleIllustration', () => require('../src/components/home/HomePuzzleIllustration'));
-
-      // 3D Components
-      check('src/components/3d/orbitArrow', () => require('../src/components/3d/orbitArrow'));
-      check('src/components/3d/ThreeCanvas', () => require('../src/components/3d/ThreeCanvas'));
-      check('src/components/3d/CameraRig', () => require('../src/components/3d/CameraRig'));
-      check('src/components/3d/Cube3DView', () => require('../src/components/3d/Cube3DView'));
-      check('src/components/3d/PuzzleCube3D', () => require('../src/components/3d/PuzzleCube3D'));
-      check('src/components/3d/Pyraminx3D', () => require('../src/components/3d/Pyraminx3D'));
-      check('src/components/3d/Pyraminx3DView', () => require('../src/components/3d/Pyraminx3DView'));
-      check('src/components/3d/cubieModel', () => require('../src/components/3d/cubieModel'));
-      check('src/components/3d/puzzleTurnInfo', () => require('../src/components/3d/puzzleTurnInfo'));
-      check('src/components/3d/stickerLayout', () => require('../src/components/3d/stickerLayout'));
-      check('src/components/3d/DirectionArrow3D', () => require('../src/components/3d/DirectionArrow3D'));
-      check('src/components/3d/TurnArrowRibbon3D', () => require('../src/components/3d/TurnArrowRibbon3D'));
-
-      // Puzzle engine & constants
-      check('src/puzzleEngine/puzzleEngine', () => require('../src/puzzleEngine/puzzleEngine'));
-      check('src/puzzleEngine/stepPlan', () => require('../src/puzzleEngine/stepPlan'));
-      check('src/components/playback/playbackController', () => require('../src/components/playback/playbackController'));
-      check('src/constants/adsConfig', () => require('../src/constants/adsConfig'));
-      check('src/constants/colors', () => require('../src/constants/colors'));
-      check('src/constants/homeTheme', () => require('../src/constants/homeTheme'));
-      check('src/constants/learnContent', () => require('../src/constants/learnContent'));
-      check('src/constants/licensesData', () => require('../src/constants/licensesData'));
-      check('src/constants/links', () => require('../src/constants/links'));
-
-      // Startup functions type checks
       try {
-        const kAdapter = require('../src/solvers/cube3x3/kociembaAdapter');
-        const c2Solver = require('../src/solvers/cube2x2/cube2x2Solver');
-        const pSolver = require('../src/solvers/pyraminx/pyraminxSolver');
-        const solversIdx = require('../src/solvers/index');
+        // Leaf packages
+        check('react-native-svg', () => require('react-native-svg'));
+        check('react-native-gesture-handler', () => require('react-native-gesture-handler'));
+        check('react-native-reanimated', () => require('react-native-reanimated'));
+        check('react-native-worklets', () => require('react-native-worklets'));
+        check('react-native-safe-area-context', () => require('react-native-safe-area-context'));
+        check('react-native-screens', () => require('react-native-screens'));
+        check('lucide-react-native', () => require('lucide-react-native'));
+        check('zustand', () => require('zustand'));
+        check('@react-native-async-storage/async-storage', () => require('@react-native-async-storage/async-storage'));
+        check('jpeg-js', () => require('jpeg-js'));
+        check('expo-haptics', () => require('expo-haptics'));
+        check('expo-keep-awake', () => require('expo-keep-awake'));
+        check('expo-camera', () => require('expo-camera'));
+        check('expo-asset', () => require('expo-asset'));
+        check('expo-file-system', () => require('expo-file-system'));
+        check('expo-gl', () => require('expo-gl'));
+        check('three', () => require('three'));
+        check('@react-three/fiber/native', () => require('@react-three/fiber/native'));
+        check('react-native-google-mobile-ads', () => require('react-native-google-mobile-ads'));
 
-        console.warn(`[BOOTCHECK] typeof initCube3x3Solver: ${typeof kAdapter.initCube3x3Solver}`);
-        console.warn(`[BOOTCHECK] typeof isCube3x3SolverReady: ${typeof kAdapter.isCube3x3SolverReady}`);
-        console.warn(`[BOOTCHECK] typeof onCube3x3SolverReady: ${typeof kAdapter.onCube3x3SolverReady}`);
-        console.warn(`[BOOTCHECK] typeof initCube2x2Solver: ${typeof c2Solver.initCube2x2Solver}`);
-        console.warn(`[BOOTCHECK] typeof initPyraminxSolver: ${typeof pSolver.initPyraminxSolver}`);
-        console.warn(`[BOOTCHECK] typeof getPuzzle: ${typeof solversIdx.getPuzzle}`);
-      } catch (err: any) {
-        console.warn(`[BOOTCHECK] FAIL type checks | ${String(err && err.message)}`);
+        // Key exports typeof checks for 3D stack
+        try {
+          const threeMod = require('three');
+          const expoGlMod = require('expo-gl');
+          const r3fMod = require('@react-three/fiber/native');
+
+          console.warn(`[BOOTCHECK] typeof THREE.Scene: ${typeof threeMod.Scene}`);
+          console.warn(`[BOOTCHECK] typeof GLView: ${typeof expoGlMod.GLView}`);
+          console.warn(`[BOOTCHECK] typeof Canvas: ${typeof r3fMod.Canvas}`);
+          console.warn(`[BOOTCHECK] typeof extend: ${typeof r3fMod.extend}`);
+          console.warn(`[BOOTCHECK] typeof createRoot: ${typeof r3fMod.createRoot}`);
+          console.warn(`[BOOTCHECK] typeof events: ${typeof r3fMod.events}`);
+        } catch (err: any) {
+          console.warn(`[BOOTCHECK] FAIL 3D exports check | ${String(err && err.message)}`);
+        }
+
+        // 3D Components
+        check('src/components/3d/ThreeCanvas', () => require('../src/components/3d/ThreeCanvas'));
+        check('src/components/3d/CameraRig', () => require('../src/components/3d/CameraRig'));
+        check('src/components/3d/cubieModel', () => require('../src/components/3d/cubieModel'));
+        check('src/components/3d/stickerLayout', () => require('../src/components/3d/stickerLayout'));
+        check('src/components/3d/orbitArrow', () => require('../src/components/3d/orbitArrow'));
+        check('src/components/3d/puzzleTurnInfo', () => require('../src/components/3d/puzzleTurnInfo'));
+        check('src/components/3d/Cube3DView', () => require('../src/components/3d/Cube3DView'));
+        check('src/components/3d/PuzzleCube3D', () => require('../src/components/3d/PuzzleCube3D'));
+        check('src/components/3d/Pyraminx3D', () => require('../src/components/3d/Pyraminx3D'));
+        check('src/components/3d/Pyraminx3DView', () => require('../src/components/3d/Pyraminx3DView'));
+
+        // Nets
+        check('src/components/PuzzleNet', () => require('../src/components/PuzzleNet'));
+        check('src/components/NetView2x2', () => require('../src/components/NetView2x2'));
+        check('src/components/NetView3x3', () => require('../src/components/NetView3x3'));
+        check('src/components/NetViewPyraminx', () => require('../src/components/NetViewPyraminx'));
+
+        // App routes
+        check('app/input', () => require('./input'));
+        check('app/player', () => require('./player'));
+        check('app/gallery', () => require('./gallery'));
+        check('app/learn', () => require('./learn'));
+        check('app/settings', () => require('./settings'));
+        check('app/index', () => require('./index'));
+
+        // Solvers & constants checks
+        check('src/solvers/index', () => require('../src/solvers/index'));
+        check('src/solvers/cube3x3/kociembaAdapter', () => require('../src/solvers/cube3x3/kociembaAdapter'));
+        check('src/solvers/cube2x2/cube2x2Solver', () => require('../src/solvers/cube2x2/cube2x2Solver'));
+        check('src/solvers/pyraminx/pyraminxSolver', () => require('../src/solvers/pyraminx/pyraminxSolver'));
+        check('src/solvers/cube4x4/cube4x4Solver', () => require('../src/solvers/cube4x4/cube4x4Solver'));
+        check('src/puzzleEngine/puzzleEngine', () => require('../src/puzzleEngine/puzzleEngine'));
+        check('src/constants/learnContent', () => require('../src/constants/learnContent'));
+
+        // Startup functions type checks
+        try {
+          const kAdapter = require('../src/solvers/cube3x3/kociembaAdapter');
+          const c2Solver = require('../src/solvers/cube2x2/cube2x2Solver');
+          const pSolver = require('../src/solvers/pyraminx/pyraminxSolver');
+          const solversIdx = require('../src/solvers/index');
+
+          console.warn(`[BOOTCHECK] typeof initCube3x3Solver: ${typeof kAdapter.initCube3x3Solver}`);
+          console.warn(`[BOOTCHECK] typeof isCube3x3SolverReady: ${typeof kAdapter.isCube3x3SolverReady}`);
+          console.warn(`[BOOTCHECK] typeof onCube3x3SolverReady: ${typeof kAdapter.onCube3x3SolverReady}`);
+          console.warn(`[BOOTCHECK] typeof initCube2x2Solver: ${typeof c2Solver.initCube2x2Solver}`);
+          console.warn(`[BOOTCHECK] typeof initPyraminxSolver: ${typeof pSolver.initPyraminxSolver}`);
+          console.warn(`[BOOTCHECK] typeof getPuzzle: ${typeof solversIdx.getPuzzle}`);
+        } catch (err: any) {
+          console.warn(`[BOOTCHECK] FAIL type checks | ${String(err && err.message)}`);
+        }
+      } finally {
+        if (errorUtils?.setGlobalHandler && prevHandler) {
+          errorUtils.setGlobalHandler(prevHandler);
+        }
       }
 
       console.warn('[BOOTCHECK] DONE');
