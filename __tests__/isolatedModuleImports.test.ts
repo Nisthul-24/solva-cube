@@ -106,6 +106,18 @@ describe('Isolated Module Load Order Verification', () => {
     expect(() => (process as any).emitWarning('test deprecation warning')).not.toThrow();
   });
 
+  it('ensures FinalizationRegistry and WeakRef are safely polyfilled for Hermes environments', () => {
+    require('../src/polyfills');
+    expect(typeof (globalThis as any).FinalizationRegistry).toBe('function');
+    expect(typeof (globalThis as any).WeakRef).toBe('function');
+    const registry = new (globalThis as any).FinalizationRegistry(() => {});
+    expect(typeof registry.register).toBe('function');
+    expect(typeof registry.unregister).toBe('function');
+    const obj = { test: 123 };
+    const weakRef = new (globalThis as any).WeakRef(obj);
+    expect(weakRef.deref()).toBe(obj);
+  });
+
   allFiles.forEach((file) => {
     const relativePath = path.relative(path.resolve(__dirname, '..'), file).replace(/\\/g, '/');
 

@@ -88,6 +88,8 @@ export default function RootLayout() {
           const r3fMod = require('@react-three/fiber/native');
 
           console.warn(`[BOOTCHECK] typeof THREE.Scene: ${typeof threeMod.Scene}`);
+          console.warn(`[BOOTCHECK] typeof FinalizationRegistry: ${typeof (globalThis as any).FinalizationRegistry}`);
+          console.warn(`[BOOTCHECK] typeof WeakRef: ${typeof (globalThis as any).WeakRef}`);
           console.warn(`[BOOTCHECK] typeof GLView: ${typeof expoGlMod.GLView}`);
           console.warn(`[BOOTCHECK] typeof Canvas: ${typeof r3fMod.Canvas}`);
           console.warn(`[BOOTCHECK] typeof extend: ${typeof r3fMod.extend}`);
